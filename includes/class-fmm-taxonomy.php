@@ -126,6 +126,24 @@ class FMM_Taxonomy {
 	}
 
 	/**
+	 * Removes folder relationships from objects that are not attachments
+	 * (set_object_terms action). wp_set_object_terms() offers no filter to
+	 * reject terms and core's tax_input handling does not check the post
+	 * type, so every assignment path is corrected here. wp_remove_object_terms() does not
+	 * fire set_object_terms (no recursion) and updates the folder counts.
+	 *
+	 * @param int    $object_id Object ID.
+	 * @param array  $terms     Terms passed to wp_set_object_terms().
+	 * @param array  $tt_ids    Term taxonomy IDs.
+	 * @param string $taxonomy  Taxonomy.
+	 */
+	public static function restrict_to_attachments( $object_id, $terms, $tt_ids, $taxonomy ) {
+		if ( self::NAME === $taxonomy && 'attachment' !== get_post_type( $object_id ) ) {
+			wp_delete_object_term_relationships( $object_id, self::NAME );
+		}
+	}
+
+	/**
 	 * Adds or removes validated folders for many attachments. Each attachment
 	 * is checked with can_assign(); other folder assignments stay untouched.
 	 *

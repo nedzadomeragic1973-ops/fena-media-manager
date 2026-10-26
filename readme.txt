@@ -63,6 +63,12 @@ The media modal ("Media Library" button) has the folder filter.
 Yes, with the filters `fmm_manage_folders_capability` (default
 `edit_others_posts`) and `fmm_default_folders`.
 
+`fmm_manage_folders_capability` is security relevant: every user with the
+returned capability may create, rename and delete folders for the whole site.
+Return a capability that only trusted roles have, never `read` or
+`upload_files`. Assigning media is not affected; it always requires
+`upload_files` plus permission to edit the media file.
+
 == Changelog ==
 
 = 1.0.0 =
@@ -74,4 +80,5 @@ Yes, with the filters `fmm_manage_folders_capability` (default
 * Uploads are assigned to the active folder.
 * Subfolders with a collapsible tree in the sidebar and indented folder lists.
 * Folder checkboxes in the attachment details.
+* Folders can only be assigned to attachments; assignments to posts, pages and other post types are removed.
 * Asset versions use the file modification time in local and development environments.

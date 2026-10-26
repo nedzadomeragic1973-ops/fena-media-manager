@@ -19,6 +19,7 @@ class FMM_Plugin {
 		add_action( 'init', array( __CLASS__, 'on_init' ), 5 );
 		add_action( 'admin_init', array( 'FMM_Installer', 'maybe_seed' ) );
 		add_action( 'rest_api_init', array( 'FMM_REST', 'register_routes' ) );
+		add_action( 'set_object_terms', array( 'FMM_Taxonomy', 'restrict_to_attachments' ), 10, 4 );
 		FMM_Attachment_Fields::init();
 		FMM_Library::init();
 		FMM_List_Mode::init();
