@@ -1,0 +1,417 @@
+/**
+ * Fena Media Manager: folder sidebar (media library grid) and modal folder filter.
+ *
+ * @package Fena_Media_Manager
+ */
+
+/* Plugin palette: scoped to plugin elements, independent of the admin color scheme */
+.fmm-sidebar,
+.fmm-drag-ghost {
+	--fmm-accent: #1b1b1b;
+	--fmm-hover: #2a2a2a;
+	--fmm-active-bg: #f3f4f4;
+	--fmm-border: #e5e5e5;
+	--fmm-muted: #6b6b6b;
+}
+
+/* Plugin buttons (core button classes, scoped by plugin class) */
+.fmm-sidebar .button.fmm-sidebar__new,
+.fmm-form .button.fmm-form-cancel {
+	color: var(--fmm-accent);
+	background: #fff;
+	border-color: var(--fmm-accent);
+}
+
+.fmm-sidebar .button.fmm-sidebar__new:hover,
+.fmm-form .button.fmm-form-cancel:hover {
+	color: var(--fmm-hover);
+	background: var(--fmm-active-bg);
+	border-color: var(--fmm-hover);
+}
+
+.fmm-form .button.button-primary {
+	color: #fff;
+	background: var(--fmm-accent);
+	border-color: var(--fmm-accent);
+}
+
+.fmm-form .button.button-primary:hover {
+	color: #fff;
+	background: var(--fmm-hover);
+	border-color: var(--fmm-hover);
+}
+
+.fmm-sidebar .button.fmm-sidebar__new:focus,
+.fmm-form .button.fmm-form-cancel:focus,
+.fmm-form .button.button-primary:focus {
+	border-color: var(--fmm-accent);
+	outline: 2px solid transparent;
+	box-shadow: 0 0 0 1px #fff, 0 0 0 3px var(--fmm-accent);
+}
+
+.fmm-form .fmm-form__input:focus {
+	border-color: var(--fmm-accent);
+	box-shadow: 0 0 0 1px var(--fmm-accent);
+}
+
+/* Layout: sidebar next to the media grid */
+.fmm-layout {
+	display: flex;
+	align-items: flex-start;
+	gap: 20px;
+}
+
+.fmm-layout > .media-frame {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.fmm-sidebar {
+	flex: 0 0 220px;
+	min-width: 0; /* Long folder names must not widen the sidebar (flex min-width: auto). */
+	box-sizing: border-box;
+	margin-top: 10px;
+	padding: 12px 0;
+	background: #fff;
+	border: 1px solid var(--fmm-border);
+	box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.fmm-sidebar__header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 0 12px 10px;
+	border-bottom: 1px solid #f0f0f1;
+}
+
+.fmm-sidebar__title {
+	margin: 0;
+	font-size: 14px;
+	line-height: 1.4;
+}
+
+.fmm-sidebar__new {
+	display: inline-flex !important;
+	align-items: center;
+	gap: 2px;
+}
+
+.fmm-sidebar__new .dashicons {
+	width: 16px;
+	height: 16px;
+	font-size: 16px;
+}
+
+.fmm-sidebar__notice.notice {
+	margin: 10px 12px 0;
+}
+
+.fmm-sidebar__list {
+	margin: 8px 0 0;
+	padding: 0;
+	list-style: none;
+}
+
+.fmm-sidebar__item {
+	position: relative;
+	display: flex;
+	align-items: center;
+	margin: 0;
+	border-left: 3px solid transparent;
+}
+
+.fmm-sidebar__item:hover,
+.fmm-sidebar__item:focus-within {
+	background: #f6f7f7;
+}
+
+.fmm-sidebar__item.is-active {
+	background: var(--fmm-active-bg);
+	border-left-color: var(--fmm-accent);
+}
+
+/* Folder tree: subfolders are indented; the chevron column only exists while any folder has subfolders */
+.fmm-sidebar__item {
+	padding-left: calc(var(--fmm-depth, 0) * 16px);
+}
+
+.fmm-folder-toggle {
+	display: flex;
+	flex: none;
+	align-items: center;
+	justify-content: center;
+	width: 20px;
+	height: 24px;
+	margin-left: 4px;
+	padding: 0;
+	color: var(--fmm-muted);
+	background: none;
+	border: 0;
+	border-radius: 2px;
+	cursor: pointer;
+}
+
+.fmm-folder-toggle--empty {
+	cursor: default;
+}
+
+.fmm-sidebar .fmm-folder-toggle:hover {
+	color: var(--fmm-hover);
+}
+
+.fmm-sidebar .fmm-folder-toggle:focus {
+	color: var(--fmm-accent);
+	outline: 2px solid var(--fmm-accent);
+	outline-offset: 0;
+	box-shadow: none;
+}
+
+.fmm-folder-toggle .dashicons {
+	width: 16px;
+	height: 16px;
+	font-size: 16px;
+}
+
+.fmm-sidebar.has-tree .fmm-folder {
+	padding-left: 2px;
+}
+
+.fmm-folder {
+	display: flex;
+	flex: 1 1 auto;
+	align-items: center;
+	gap: 8px;
+	min-width: 0;
+	padding: 7px 9px;
+	color: #1d2327;
+	font-size: 13px;
+	line-height: 1.4;
+	text-align: left;
+	background: none;
+	border: 0;
+	cursor: pointer;
+}
+
+.fmm-sidebar__item.is-active .fmm-folder {
+	color: var(--fmm-accent);
+	font-weight: 600;
+}
+
+.fmm-folder:focus {
+	outline: 2px solid var(--fmm-accent);
+	outline-offset: -2px;
+	box-shadow: none;
+}
+
+.fmm-folder .dashicons {
+	flex: none;
+	color: #8c8f94;
+}
+
+.fmm-sidebar__item.is-active .fmm-folder .dashicons {
+	color: inherit;
+}
+
+.fmm-folder__name {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+
+.fmm-folder__count {
+	flex: none;
+	color: var(--fmm-muted);
+	font-size: 12px;
+	font-weight: 400;
+}
+
+/* Rename/delete: always in the DOM and focusable, shown in place of the count on hover/focus */
+.fmm-folder__actions {
+	position: absolute;
+	top: 50%;
+	right: 6px;
+	display: flex;
+	flex: none;
+	padding-left: 4px;
+	background: inherit; /* Row color: normal, hover, active, drop target. */
+	opacity: 0;
+	transform: translateY(-50%);
+}
+
+.fmm-sidebar__item:hover .fmm-folder__actions,
+.fmm-sidebar__item:focus-within .fmm-folder__actions {
+	opacity: 1;
+}
+
+/*
+ * While the actions are shown, the folder button gives up their width
+ * (3 buttons of 22px + 4px gap + 6px offset) so the name ends with an
+ * ellipsis before them instead of running underneath.
+ */
+@media screen and (min-width: 783px) {
+
+	.fmm-sidebar__item:has(.fmm-folder__actions):hover .fmm-folder,
+	.fmm-sidebar__item:has(.fmm-folder__actions):focus-within .fmm-folder {
+		padding-right: 76px;
+	}
+
+	.fmm-sidebar__item:has(.fmm-folder__actions):hover .fmm-folder__count,
+	.fmm-sidebar__item:has(.fmm-folder__actions):focus-within .fmm-folder__count {
+		display: none;
+	}
+}
+
+/* Assign the bulk selection: always visible while media is selected */
+.fmm-folder__assign {
+	display: flex;
+	flex: none;
+	gap: 2px;
+	padding-right: 6px;
+}
+
+.fmm-sidebar .fmm-folder__actions .button-link,
+.fmm-sidebar .fmm-folder__assign .button-link {
+	padding: 4px 3px;
+	color: var(--fmm-muted);
+	text-decoration: none;
+	border-radius: 2px;
+}
+
+.fmm-sidebar .fmm-folder__actions .button-link:hover,
+.fmm-sidebar .fmm-folder__assign .button-link:hover {
+	color: var(--fmm-hover);
+}
+
+.fmm-sidebar .fmm-folder__actions .button-link:focus,
+.fmm-sidebar .fmm-folder__assign .button-link:focus {
+	color: var(--fmm-accent);
+	outline: 2px solid var(--fmm-accent);
+	outline-offset: 0;
+	box-shadow: none;
+}
+
+.fmm-sidebar .fmm-folder__actions .fmm-folder-delete:hover,
+.fmm-sidebar .fmm-folder__actions .fmm-folder-delete:focus,
+.fmm-sidebar .fmm-folder__assign .fmm-folder-remove:hover,
+.fmm-sidebar .fmm-folder__assign .fmm-folder-remove:focus {
+	color: #d63638;
+}
+
+.fmm-folder__actions .dashicons,
+.fmm-folder__assign .dashicons {
+	width: 16px;
+	height: 16px;
+	font-size: 16px;
+}
+
+.fmm-sidebar__selection {
+	margin: 10px 12px 0;
+	padding: 8px 10px;
+	color: #1d2327;
+	font-size: 12px;
+	line-height: 1.5;
+	background: var(--fmm-active-bg);
+	border-left: 3px solid var(--fmm-accent);
+}
+
+/* Drag-and-drop target */
+.fmm-sidebar__item.is-drop-target {
+	background: var(--fmm-active-bg);
+	outline: 1px dashed var(--fmm-accent);
+	outline-offset: -1px;
+}
+
+.fmm-sidebar__item.is-drop-target .fmm-folder .dashicons {
+	color: var(--fmm-accent);
+}
+
+.fmm-drag-ghost {
+	position: fixed;
+	top: -100px;
+	left: -100px;
+	padding: 4px 10px;
+	color: #fff;
+	font-size: 12px;
+	background: var(--fmm-accent);
+	border-radius: 2px;
+}
+
+.fmm-sidebar__notice.notice.is-dismissible {
+	padding-right: 38px;
+}
+
+/* Inline create/rename form */
+.fmm-form {
+	flex: 1 1 auto;
+	padding: 6px 9px 8px;
+}
+
+.fmm-form__input {
+	width: 100%;
+	margin: 0 0 6px;
+}
+
+.fmm-form__buttons {
+	display: flex;
+	gap: 6px;
+}
+
+/*
+ * Modal folder filter. Core places its filters in a two-column grid by ID
+ * (type, date); the folder filter takes the next column.
+ */
+label[for="fmm-attachment-folder-filter"] {
+	grid-area: 1 / 2 / 2 / 3;
+}
+
+select#fmm-attachment-folder-filter {
+	grid-area: 2 / 2 / 3 / 3;
+}
+
+.media-toolbar-secondary:has(#media-attachment-filters):has(#fmm-attachment-folder-filter) {
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+select#media-attachment-filters ~ label[for="fmm-attachment-folder-filter"] {
+	grid-area: 1 / 3 / 2 / 4;
+}
+
+select#media-attachment-filters ~ select#fmm-attachment-folder-filter {
+	grid-area: 2 / 3 / 3 / 4;
+}
+
+@media screen and (max-width: 782px) {
+	.fmm-layout {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	.fmm-sidebar {
+		flex-basis: auto;
+	}
+
+	.fmm-folder__actions {
+		position: static;
+		padding-right: 6px;
+		opacity: 1;
+		transform: none;
+	}
+
+	.fmm-sidebar__item .fmm-folder__count {
+		visibility: visible !important;
+	}
+
+	.fmm-sidebar .fmm-folder__actions .button-link,
+	.fmm-sidebar .fmm-folder__assign .button-link {
+		padding: 8px 6px;
+	}
+
+	.fmm-folder {
+		padding-top: 10px;
+		padding-bottom: 10px;
+	}
+}

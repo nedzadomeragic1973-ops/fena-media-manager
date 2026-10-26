@@ -1,0 +1,26 @@
+# OS / editor files
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*~
+.idea/
+.vscode/
+
+# Dependencies and build output
+node_modules/
+vendor/
+/build/
+/dist/
+
+# Release archives, logs, local test artifacts
+*.zip
+*.log
+.phpcs-cache
+/tests/artifacts/
+
+# Local secrets and environment files (never commit)
+.env
+.env.*
+*.cnf
+cookie.php
