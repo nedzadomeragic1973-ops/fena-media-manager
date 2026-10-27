@@ -23,6 +23,7 @@ class FMM_Plugin {
 		FMM_Attachment_Fields::init();
 		FMM_Library::init();
 		FMM_List_Mode::init();
+		FMM_Settings::init();
 	}
 
 	/**

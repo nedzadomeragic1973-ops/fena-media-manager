@@ -58,6 +58,19 @@
 	}
 
 	/**
+	 * Local storage when available (Safari private mode and blocked storage throw).
+	 *
+	 * @return {Storage|null} Storage.
+	 */
+	function storage() {
+		try {
+			return window.localStorage;
+		} catch ( e ) {
+			return null;
+		}
+	}
+
+	/**
 	 * Lowercases a string and removes accents, remembering for every result
 	 * character the index of the original character it came from.
 	 *
@@ -105,6 +118,15 @@
 		this.matchCount = 0;
 		this.announceTimer = null;
 
+		if ( store.treeExpanded ) {
+			_.each( store.tree(), function( node ) {
+				if ( node.hasChildren ) {
+					this.expanded[ String( node.folder.id ) ] = true;
+				}
+			}, this );
+		}
+		this.restoreFolder();
+
 		this.$el = $( '<nav class="fmm-sidebar"></nav>' ).attr( 'aria-label', __( 'Folders', 'fena-media-manager' ) );
 		this.$el.append(
 			$( '<div class="fmm-sidebar__header"></div>' ).append(
@@ -130,6 +152,46 @@
 	}
 
 	_.extend( Sidebar.prototype, {
+
+		/**
+		 * Restores the folder that was selected last (setting "Restore last
+		 * folder") and remembers every later selection. Without the setting
+		 * nothing is read or written.
+		 */
+		restoreFolder: function() {
+			var self = this;
+			var saved = store.restoreLast && store.storageKey ? storage() : null;
+			var value;
+
+			if ( ! saved ) {
+				return;
+			}
+
+			try {
+				value = saved.getItem( store.storageKey );
+				if ( value && ( 'none' === value || ( /^\d+$/.test( value ) && store.get( value ) ) ) ) {
+					this.library.props.set( PROP, value );
+				} else if ( null !== value ) {
+					saved.removeItem( store.storageKey );
+				}
+			} catch ( e ) {
+				return;
+			}
+
+			this.library.props.on( 'change:' + PROP, function() {
+				var current = self.current();
+
+				try {
+					if ( current ) {
+						saved.setItem( store.storageKey, current );
+					} else {
+						saved.removeItem( store.storageKey );
+					}
+				} catch ( e ) {
+					return;
+				}
+			} );
+		},
 
 		/**
 		 * Folder search field (client-side filtering of the tree).

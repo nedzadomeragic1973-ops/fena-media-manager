@@ -1,0 +1,141 @@
+/**
+ * Fena Media Manager: settings page. Every selector is scoped to .fmm-settings.
+ *
+ * @package Fena_Media_Manager
+ */
+
+.fmm-settings {
+	max-width: 760px;
+	color: #1d2327;
+}
+
+.fmm-settings .fmm-card {
+	margin: 16px 0;
+	padding: 24px;
+	background: #fff;
+	border: 1px solid #e7e5e0;
+	border-radius: 6px;
+}
+
+.fmm-settings .fmm-card h2 {
+	margin: 0 0 16px;
+	padding: 0;
+	font-size: 15px;
+	font-weight: 600;
+	line-height: 1.4;
+}
+
+.fmm-settings .fmm-field {
+	display: grid;
+	grid-template-columns: 220px minmax(0, 1fr);
+	gap: 4px 16px;
+	margin: 0;
+	padding: 14px 0;
+	border: 0;
+	border-top: 1px solid #f0eeea;
+}
+
+.fmm-settings .fmm-card h2 + .fmm-field {
+	border-top: 0;
+	padding-top: 0;
+}
+
+.fmm-settings .fmm-field__label {
+	float: none;
+	width: auto;
+	margin: 0;
+	padding: 0;
+	font-size: 13px;
+	font-weight: 600;
+	line-height: 1.6;
+}
+
+.fmm-settings legend.fmm-field__label {
+	float: left;
+	width: 220px;
+}
+
+.fmm-settings fieldset.fmm-field {
+	display: block;
+	overflow: hidden;
+}
+
+.fmm-settings fieldset.fmm-field .fmm-field__control {
+	margin-left: 236px;
+}
+
+.fmm-settings .fmm-field__control select {
+	width: 100%;
+	max-width: 320px;
+}
+
+.fmm-settings .fmm-choice {
+	display: block;
+	margin: 0 0 6px;
+	font-size: 13px;
+	line-height: 1.6;
+}
+
+.fmm-settings .fmm-field__help {
+	margin: 6px 0 0;
+	color: #646970;
+	font-size: 12px;
+	line-height: 1.5;
+}
+
+.fmm-settings .fmm-card__footer {
+	margin: 8px 0 0;
+	padding: 16px 0 0;
+	border-top: 1px solid #f0eeea;
+}
+
+.fmm-settings input[type="radio"]:focus-visible,
+.fmm-settings input[type="checkbox"]:focus-visible,
+.fmm-settings select:focus-visible {
+	border-color: #5b4bc4;
+	outline: 2px solid #5b4bc4;
+	outline-offset: 1px;
+	box-shadow: none;
+}
+
+.fmm-settings .button-primary {
+	color: #fff;
+	background: #5b4bc4;
+	border-color: #5b4bc4;
+}
+
+.fmm-settings .button-primary:hover {
+	color: #fff;
+	background: #4a3ba8;
+	border-color: #4a3ba8;
+}
+
+.fmm-settings .button-primary:focus-visible {
+	color: #fff;
+	background: #4a3ba8;
+	border-color: #4a3ba8;
+	outline: 2px solid #5b4bc4;
+	outline-offset: 2px;
+	box-shadow: none;
+}
+
+@media screen and (max-width: 782px) {
+
+	.fmm-settings .fmm-field {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.fmm-settings legend.fmm-field__label {
+		float: none;
+		width: auto;
+		margin-bottom: 4px;
+	}
+
+	.fmm-settings fieldset.fmm-field .fmm-field__control {
+		margin-left: 0;
+	}
+
+	.fmm-settings .fmm-field__control select {
+		max-width: none;
+	}
+}

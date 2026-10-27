@@ -33,6 +33,9 @@
 		total: 0,
 		unassigned: 0,
 		sort: settings.sort || 'name_asc',
+		treeExpanded: !! settings.treeExpanded,
+		restoreLast: !! settings.restoreLast,
+		storageKey: settings.storageKey || '',
 		canManage: !! settings.canManage,
 
 		set: function( summary ) {
@@ -208,7 +211,7 @@
 			if ( undefined === target ) {
 				target = ( file && file.fmmFolder ) || '';
 			}
-			folders = target ? [ target ] : [];
+			folders = target && 'none' !== target ? [ target ] : [];
 		} else {
 			folders = _.map( attachment.get( 'fmmFolders' ) || [], String );
 		}
@@ -277,10 +280,11 @@
 
 	/**
 	 * The folder an uploader uploads into: the folder filter of the frame's
-	 * current library ('' for all media and unassigned).
+	 * current library. '' for all media (the server then applies the default
+	 * upload folder), 'none' for unassigned.
 	 *
 	 * @param {wp.media.view.Frame} frame Media frame.
-	 * @return {string} Folder ID or ''.
+	 * @return {string} Folder ID, 'none' or ''.
 	 */
 	function uploadFolder( frame ) {
 		var state = frame && frame.state && frame.state();
@@ -288,7 +292,7 @@
 		var value = library && library.props && library.props.get( 'query' ) ? library.props.get( PROP ) : null;
 
 		value = ( null === value || undefined === value ) ? '' : String( value );
-		return /^\d+$/.test( value ) ? value : '';
+		return /^\d+$/.test( value ) || 'none' === value ? value : '';
 	}
 
 	/**

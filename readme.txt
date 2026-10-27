@@ -18,6 +18,8 @@ data are never changed; one file can be in several folders.
 * Folder sidebar in Media > Library (grid view) with "All Media", "Unassigned"
   and media counts per folder.
 * Subfolders in any depth, shown as a collapsible tree (collapsed on load).
+* Settings page (Media > Fena Media Manager): default sort order, folder tree on load,
+  restore last folder and a default upload folder.
 * Instant folder search in the sidebar: case- and accent-insensitive, finds nested
   subfolders and temporarily expands their parents; the active folder does not change.
 * Folder colors (gray default, blue, violet, sand, green or a custom color): only the
@@ -43,7 +45,7 @@ data are never changed; one file can be in several folders.
 * Everyone who may edit a media file can assign it to existing folders;
   permissions are checked on the server for every file.
 * Six editable example folders are created once on first activation.
-* Deactivating or deleting the plugin keeps all folders and assignments.
+* Deactivating or deleting the plugin keeps all folders, assignments and settings.
 
 == Installation ==
 
@@ -62,6 +64,13 @@ No. Folders are virtual. Files, URLs, attachment IDs and metadata stay unchanged
 
 Only the folder is removed; its media stays in the library. Subfolders move up
 one level.
+
+= Which uploads use the default upload folder? =
+
+Uploads started in the media library (grid view) or in the media modal while
+"All Media" / "All folders" is selected. A selected folder always takes
+precedence and uploads started in "Unassigned" stay unassigned. Uploads through
+the REST API, the "Add New" page (media-new.php), imports and code are not affected.
 
 = Does the block editor inserter show folders? =
 
@@ -89,6 +98,8 @@ Return a capability that only trusted roles have, never `read` or
 * Move media between folders (drag and drop, → button) while keeping other folder assignments.
 * Uploads are assigned to the active folder.
 * Subfolders with a collapsible tree in the sidebar and indented folder lists.
+* Settings page with default sort order, tree on load, restore last folder and default upload folder; uploads started in "Unassigned" stay unassigned.
+* Fix: no "dependencies not registered" notice in the list view.
 * Instant folder search in the sidebar (accent/case-insensitive, finds nested subfolders, does not change the active folder).
 * Folder colors (gray default, blue, violet, sand, green, custom); only the folder icon is colored, stored per folder.
 * Folders can be moved to another parent or the top level ("Move to…", drag and drop); media assignments stay unchanged.

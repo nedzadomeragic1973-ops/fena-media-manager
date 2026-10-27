@@ -26,17 +26,26 @@ class FMM_Library {
 	/**
 	 * Media uploader (async-upload.php, action upload-attachment): assigns the
 	 * new attachment to the folder that was active when the upload started.
-	 * The uploader sends it as `fmm_folder`; other upload paths never do.
+	 * The uploader sends it as `fmm_folder` ('none' for "Unassigned", which
+	 * stays unassigned); when it sends nothing ("All Media"), the default
+	 * upload folder setting applies. REST uploads, sideloads, media-new.php
+	 * and programmatic inserts are not affected.
 	 *
 	 * @param int $attachment_id New attachment ID.
 	 */
 	public static function assign_upload( $attachment_id ) {
-		if ( ! wp_doing_ajax() || ! isset( $_POST['action'], $_POST['fmm_folder'] ) || 'upload-attachment' !== $_POST['action'] || ! check_ajax_referer( 'media-form', false, false ) ) {
+		if ( ! wp_doing_ajax() || ! isset( $_POST['action'] ) || 'upload-attachment' !== $_POST['action'] || ! check_ajax_referer( 'media-form', false, false ) ) {
 			return;
 		}
 
-		$folder     = sanitize_text_field( wp_unslash( $_POST['fmm_folder'] ) );
-		$folder_ids = ctype_digit( $folder ) ? FMM_Taxonomy::filter_folder_ids( array( (int) $folder ) ) : array();
+		if ( isset( $_POST['fmm_folder'] ) ) {
+			$folder     = sanitize_text_field( wp_unslash( $_POST['fmm_folder'] ) );
+			$folder_ids = ctype_digit( $folder ) ? FMM_Taxonomy::filter_folder_ids( array( (int) $folder ) ) : array();
+		} else {
+			$default    = (int) FMM_Settings::get( 'upload_folder' );
+			$folder_ids = $default ? array( $default ) : array();
+		}
+
 		if ( $folder_ids && FMM_Taxonomy::can_assign( $attachment_id ) ) {
 			wp_set_object_terms( (int) $attachment_id, $folder_ids, FMM_Taxonomy::NAME, true );
 		}
@@ -51,7 +60,7 @@ class FMM_Library {
 	 * @param string $file Path relative to the plugin directory.
 	 * @return string
 	 */
-	private static function asset_version( $file ) {
+	public static function asset_version( $file ) {
 		$dev = in_array( wp_get_environment_type(), array( 'local', 'development' ), true ) || ( defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG );
 
 		if ( $dev && file_exists( FMM_PATH . $file ) ) {
@@ -85,7 +94,12 @@ class FMM_Library {
 			'fmmMediaSettings',
 			array_merge(
 				self::get_summary(),
-				array( 'canManage' => FMM_Taxonomy::can_manage() )
+				array(
+					'canManage'    => FMM_Taxonomy::can_manage(),
+					'treeExpanded' => (bool) FMM_Settings::get( 'tree_expanded' ),
+					'restoreLast'  => (bool) FMM_Settings::get( 'restore_last_folder' ),
+					'storageKey'   => 'fmm-last-folder-' . get_current_blog_id() . '-' . get_current_user_id(),
+				)
 			)
 		);
 	}
@@ -97,7 +111,8 @@ class FMM_Library {
 	 * @param string $hook_suffix Current admin page.
 	 */
 	public static function enqueue_upload_screen( $hook_suffix ) {
-		if ( 'upload.php' !== $hook_suffix || ! FMM_Taxonomy::can_read() ) {
+		// The folder store is only registered once wp_enqueue_media() ran (grid mode); the list view has no sidebar.
+		if ( 'upload.php' !== $hook_suffix || ! FMM_Taxonomy::can_read() || ! wp_script_is( 'fmm-media-filter', 'registered' ) ) {
 			return;
 		}
 

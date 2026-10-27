@@ -143,7 +143,7 @@ class FMM_Taxonomy {
 	 * @return string One of SORT_MODES.
 	 */
 	private static function default_sort_mode() {
-		return 'name_asc';
+		return FMM_Settings::get( 'default_sort' );
 	}
 
 	/**
