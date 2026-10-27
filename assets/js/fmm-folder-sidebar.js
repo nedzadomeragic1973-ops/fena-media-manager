@@ -43,6 +43,7 @@
 		expanded: 'arrow-down-alt2',
 		rename: 'edit',
 		more: 'ellipsis',
+		'move-to': 'move',
 		'move-up': 'arrow-up-alt2',
 		'move-down': 'arrow-down-alt2',
 		'delete': 'trash'
@@ -258,6 +259,13 @@
 				self.menuOpen = self.menuOpen === id ? null : id;
 				self.render();
 				self.focusKey( 'menu-' + id );
+			} );
+
+			this.$el.on( 'click', '.fmm-folder-moveto', function() {
+				var id = String( $( this ).closest( 'li' ).data( 'folder' ) );
+				self.menuOpen = null;
+				self.render();
+				self.openMoveDialog( id );
 			} );
 
 			this.$el.on( 'click', '.fmm-folder-up, .fmm-folder-down', function() {
@@ -483,32 +491,42 @@
 		},
 
 		clearFolderDrop: function() {
-			this.$el.find( '.is-drop-before, .is-drop-after' ).removeClass( 'is-drop-before is-drop-after' );
+			this.$el.find( '.is-drop-before, .is-drop-after, .is-drop-into' ).removeClass( 'is-drop-before is-drop-after is-drop-into' );
 		},
 
 		/**
-		 * Where a dragged folder would be dropped: next to a sibling row.
+		 * Where a dragged folder would be dropped: next to a sibling row
+		 * (manual order only, top and bottom quarter) or into a folder.
 		 *
 		 * @param {Event} event Drag event.
-		 * @return {Object|null} { $row, id, position: 'before'|'after' } or null.
+		 * @return {Object|null} { $row, id, position: 'before'|'after'|'into' } or null.
 		 */
 		folderDropTarget: function( event ) {
 			var $row = $( event.target ).closest( '.fmm-sidebar__item--folder' );
 			var dragged = this.node( this.dragFolder );
-			var target, rect;
+			var target, rect, ratio, position;
 
 			if ( ! $row.length || ! $.contains( this.$el[ 0 ], $row[ 0 ] ) || ! dragged ) {
 				return null;
 			}
 
 			target = this.node( $row.data( 'folder' ) );
-			if ( ! target || target === dragged || this.parentOf( target ) !== this.parentOf( dragged ) ) {
+			if ( ! target || String( target.folder.id ) === this.dragFolder ) {
 				return null;
 			}
 
 			rect = $row[ 0 ].getBoundingClientRect();
+			ratio = ( event.clientY - rect.top ) / rect.height;
 
-			return { $row: $row, id: String( target.folder.id ), position: event.clientY < rect.top + rect.height / 2 ? 'before' : 'after' };
+			if ( 'manual' === store.sort && this.parentOf( target ) === this.parentOf( dragged ) && ( ratio < 0.25 || ratio > 0.75 ) ) {
+				position = ratio < 0.25 ? 'before' : 'after';
+			} else if ( ! _.contains( target.parents, this.dragFolder ) && String( target.folder.id ) !== this.parentOf( dragged ) ) {
+				position = 'into';
+			} else {
+				return null;
+			}
+
+			return { $row: $row, id: String( target.folder.id ), position: position };
 		},
 
 		folderOver: function( event ) {
@@ -519,7 +537,7 @@
 			if ( target ) {
 				event.preventDefault();
 				event.dataTransfer.dropEffect = 'move';
-				target.$row.addClass( 'before' === target.position ? 'is-drop-before' : 'is-drop-after' );
+				target.$row.addClass( 'is-drop-' + target.position );
 			}
 		},
 
@@ -537,11 +555,228 @@
 				return;
 			}
 
+			if ( 'into' === target.position ) {
+				this.dropIntoFolder( dragged, target.id );
+				return;
+			}
+
 			ids = _.without( info.ids, dragged );
 			ids.splice( _.indexOf( ids, target.id ) + ( 'after' === target.position ? 1 : 0 ), 0, dragged );
 			if ( ! _.isEqual( ids, info.ids ) ) {
 				this.saveOrder( dragged, info.parent, ids );
 			}
+		},
+
+		/**
+		 * Moves a dragged folder into another folder.
+		 *
+		 * @param {string} id     Dragged folder ID.
+		 * @param {string} target Destination folder ID.
+		 */
+		dropIntoFolder: function( id, target ) {
+			var self = this;
+			var folder = store.get( id );
+			var destination = store.get( target );
+
+			if ( this.busy || ! folder || ! destination ) {
+				return;
+			}
+
+			this.moveFolder( id, target ).catch( function( error ) {
+				if ( error && 'fmm_folder_exists' === error.code ) {
+					/* translators: 1: folder name, 2: destination folder name. */
+					self.notice( sprintf( __( 'A folder named “%1$s” already exists in “%2$s”. Use “Move to…” to move and rename it.', 'fena-media-manager' ), folder.name, destination.name ), 'error' );
+					return;
+				}
+				self.fail( error, __( 'The folder could not be moved.', 'fena-media-manager' ) );
+			} );
+		},
+
+		/**
+		 * Moves a folder below another folder (or to the top level) and
+		 * optionally renames it. The folder keeps its media and subfolders.
+		 *
+		 * @param {string} id       Folder ID.
+		 * @param {string} target   Destination folder ID, '0' for the top level.
+		 * @param {string} [name]   New name.
+		 * @return {Promise} Rejects with the REST error.
+		 */
+		moveFolder: function( id, target, name ) {
+			var self = this;
+			var data = { parent: Number( target ) || 0 };
+
+			if ( name ) {
+				data.name = name;
+			}
+
+			this.busy = true;
+			return wp.apiFetch( { path: '/fmm/v1/folders/' + id, method: 'PATCH', data: data } ).then( function( folder ) {
+				var destination = store.get( target );
+
+				self.busy = false;
+				self.expandTo( target );
+				self.notice( destination ?
+					/* translators: 1: folder name, 2: destination folder name. */
+					sprintf( __( 'Folder “%1$s” moved to “%2$s”.', 'fena-media-manager' ), folder.name, destination.name ) :
+					/* translators: %s: folder name. */
+					sprintf( __( 'Folder “%s” moved to the top level.', 'fena-media-manager' ), folder.name ), 'success' );
+
+				return store.refresh().then( function() {
+					self.focusKey( 'folder-' + id );
+				} );
+			}, function( error ) {
+				self.busy = false;
+				throw error;
+			} );
+		},
+
+		/**
+		 * Expands a folder and its ancestors so a moved folder is visible.
+		 *
+		 * @param {string} id Folder ID ('0' does nothing).
+		 */
+		expandTo: function( id ) {
+			var node = this.node( id );
+
+			if ( node ) {
+				this.expanded[ String( id ) ] = true;
+				_.each( node.parents, function( parent ) {
+					this.expanded[ parent ] = true;
+				}, this );
+			}
+		},
+
+		/**
+		 * Shows a modal dialog; removed again when closed.
+		 *
+		 * @param {Object}   options
+		 * @param {string}   options.title    Title.
+		 * @param {jQuery}   options.body     Body content.
+		 * @param {string}   options.submit   Primary button label.
+		 * @param {Function} options.onSubmit Called with the dialog API on submit.
+		 * @param {string}   [options.focus]  data-fmm-key to focus after closing.
+		 * @return {Object} API: { close(), error( message ), busy( flag ) }.
+		 */
+		dialog: function( options ) {
+			var self = this;
+			var titleId = 'fmm-dialog-title';
+			var $dialog = $( '<dialog class="fmm-dialog"></dialog>' ).attr( 'aria-labelledby', titleId );
+			var $error = $( '<p class="fmm-dialog__error" role="alert" hidden></p>' );
+			var $submit = $( '<button type="submit" class="button button-primary"></button>' ).text( options.submit );
+			var api = {
+				$error: $error,
+				close: function() {
+					$dialog[ 0 ].close();
+				},
+				error: function( message ) {
+					$error.text( message ).prop( 'hidden', ! message );
+				},
+				busy: function( flag ) {
+					$submit.prop( 'disabled', flag );
+				}
+			};
+
+			$dialog.append(
+				$( '<form method="dialog" class="fmm-dialog__form"></form>' ).append(
+					$( '<h2 class="fmm-dialog__title"></h2>' ).attr( 'id', titleId ).text( options.title ),
+					$( '<div class="fmm-dialog__body"></div>' ).append( options.body ),
+					$error,
+					$( '<div class="fmm-dialog__footer"></div>' ).append(
+						$submit,
+						$( '<button type="button" class="button fmm-dialog__cancel"></button>' ).text( __( 'Cancel', 'fena-media-manager' ) ).on( 'click', api.close )
+					)
+				).on( 'submit', function( event ) {
+					event.preventDefault();
+					options.onSubmit( api );
+				} )
+			);
+
+			$dialog.on( 'close', function() {
+				$dialog.remove();
+				self.focusKey( options.focus );
+			} );
+
+			$dialog.appendTo( document.body )[ 0 ].showModal();
+
+			return api;
+		},
+
+		/**
+		 * "Move to…" dialog of a folder.
+		 *
+		 * @param {string} id Folder ID.
+		 */
+		openMoveDialog: function( id ) {
+			var self = this;
+			var folder = store.get( id );
+			var node = this.node( id );
+			var current, $select, $name, $nameField;
+
+			if ( ! folder || ! node ) {
+				return;
+			}
+
+			current = this.parentOf( node );
+			$select = $( '<select id="fmm-move-target"></select>' ).append( $( '<option value="0"></option>' ).text( __( 'Top level', 'fena-media-manager' ) ) );
+			_.each( store.tree(), function( other ) {
+				if ( String( other.folder.id ) !== id && ! _.contains( other.parents, id ) ) {
+					$select.append( $( '<option></option>' ).val( String( other.folder.id ) ).text( new Array( other.depth + 1 ).join( '— ' ) + other.folder.name ) );
+				}
+			} );
+			$select.val( current );
+
+			$name = $( '<input type="text" id="fmm-move-name" maxlength="200" />' ).val( folder.name );
+			$nameField = $( '<div class="fmm-dialog__field" hidden></div>' ).append(
+				$( '<label for="fmm-move-name"></label>' ).text( __( 'New name', 'fena-media-manager' ) ),
+				$name
+			);
+
+			this.dialog( {
+				/* translators: %s: folder name. */
+				title: sprintf( __( 'Move folder “%s”', 'fena-media-manager' ), folder.name ),
+				submit: __( 'Move', 'fena-media-manager' ),
+				focus: 'folder-' + id,
+				body: [
+					$( '<div class="fmm-dialog__field"></div>' ).append(
+						$( '<label for="fmm-move-target"></label>' ).text( __( 'Destination', 'fena-media-manager' ) ),
+						$select
+					),
+					$nameField
+				],
+				onSubmit: function( api ) {
+					var target = $select.val();
+					var renaming = ! $nameField.prop( 'hidden' );
+					var name = renaming ? $.trim( $name.val() ) : '';
+					var destination = store.get( target );
+
+					if ( target === current && ! renaming ) {
+						api.close();
+						return;
+					}
+					if ( self.busy ) {
+						return;
+					}
+
+					api.error( '' );
+					api.busy( true );
+					self.moveFolder( id, target, name ).then( function() {
+						api.close();
+					}, function( error ) {
+						api.busy( false );
+						if ( error && 'fmm_folder_exists' === error.code ) {
+							$nameField.prop( 'hidden', false );
+							api.error( destination ?
+								/* translators: 1: folder name, 2: destination folder name. */
+								sprintf( __( 'A folder named “%1$s” already exists in “%2$s”. Enter a different name to move it.', 'fena-media-manager' ), name || folder.name, destination.name ) :
+								/* translators: %s: folder name. */
+								sprintf( __( 'A folder named “%s” already exists at the top level. Enter a different name to move it.', 'fena-media-manager' ), name || folder.name ) );
+							$name.trigger( 'focus' ).trigger( 'select' );
+							return;
+						}
+						api.error( ( error && error.message ) || __( 'The folder could not be moved.', 'fena-media-manager' ) );
+					} );
+				}
+			} );
 		},
 
 		/**
@@ -661,7 +896,7 @@
 						/* translators: %d: number of media items. */
 						.attr( 'aria-label', sprintf( _n( '%d item', '%d items', count, 'fena-media-manager' ), count ) )
 			);
-			if ( isFolder && 'manual' === store.sort && store.canManage && ! selected && null === this.editing ) {
+			if ( isFolder && store.canManage && ! selected && null === this.editing ) {
 				$folder.attr( 'draggable', 'true' );
 			}
 			$li.append( $folder );
@@ -739,6 +974,10 @@
 			var index = info ? _.indexOf( info.ids, id ) : -1;
 			var manual = 'manual' === store.sort;
 			var items = [ { className: 'fmm-folder-rename', icon: 'rename', key: 'rename-' + id, label: __( 'Rename', 'fena-media-manager' ) } ];
+
+			if ( window.HTMLDialogElement && HTMLDialogElement.prototype.showModal ) {
+				items.push( { className: 'fmm-folder-moveto', icon: 'move-to', key: 'moveto-' + id, label: __( 'Move to…', 'fena-media-manager' ) } );
+			}
 
 			if ( manual && index > 0 ) {
 				items.push( { className: 'fmm-folder-up', icon: 'move-up', key: 'up-' + id, label: __( 'Move up', 'fena-media-manager' ) } );

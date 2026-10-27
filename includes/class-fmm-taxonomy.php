@@ -441,6 +441,49 @@ class FMM_Taxonomy {
 	}
 
 	/**
+	 * Whether a folder named like this already exists below a parent.
+	 * Case-insensitive; orphans count as top level (see child_ids()).
+	 *
+	 * @param string $name       Plain-text name.
+	 * @param int    $parent_id  Parent folder ID, 0 for the top level.
+	 * @param int    $exclude_id Folder ID to ignore (the folder being renamed or moved).
+	 * @return bool
+	 */
+	public static function name_exists( $name, $parent_id, $exclude_id = 0 ) {
+		$folders = self::get_folders();
+		$ids     = self::child_ids( $parent_id, $folders );
+		$name    = mb_strtolower( $name );
+
+		foreach ( $folders as $folder ) {
+			if ( $folder['id'] !== (int) $exclude_id && in_array( $folder['id'], $ids, true ) && mb_strtolower( $folder['name'] ) === $name ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Whether a folder may be moved below a parent: not into itself or one
+	 * of its subfolders. Checked here because core's term loop check would
+	 * silently re-parent another folder instead.
+	 *
+	 * @param int $folder_id Folder ID.
+	 * @param int $parent_id New parent folder ID, 0 for the top level.
+	 * @return bool
+	 */
+	public static function is_valid_parent( $folder_id, $parent_id ) {
+		$folder_id = (int) $folder_id;
+		$parent_id = (int) $parent_id;
+
+		return 0 === $parent_id || (
+			null !== self::get_folder( $parent_id )
+			&& $parent_id !== $folder_id
+			&& ! in_array( $folder_id, array_map( 'intval', get_ancestors( $parent_id, self::NAME, 'taxonomy' ) ), true )
+		);
+	}
+
+	/**
 	 * Manual position for a new folder: after all of its siblings.
 	 *
 	 * @param int $parent_id Parent folder ID, 0 for the top level.

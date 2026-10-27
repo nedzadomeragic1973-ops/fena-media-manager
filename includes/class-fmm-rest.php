@@ -73,7 +73,13 @@ class FMM_REST {
 					'methods'             => WP_REST_Server::EDITABLE,
 					'callback'            => array( __CLASS__, 'update_folder' ),
 					'permission_callback' => array( 'FMM_Taxonomy', 'can_manage' ),
-					'args'                => $name_arg,
+					'args'                => array(
+						'name'   => array( 'type' => 'string' ),
+						'parent' => array(
+							'type'    => 'integer',
+							'minimum' => 0,
+						),
+					),
 				),
 				array(
 					'methods'             => WP_REST_Server::DELETABLE,
@@ -251,7 +257,10 @@ class FMM_REST {
 	}
 
 	/**
-	 * PATCH /folders/<id>. Only the name changes; the slug stays stable.
+	 * PATCH /folders/<id>. Renames and/or moves a folder; the slug stays
+	 * stable; media assignments are untouched because the term_taxonomy_id
+	 * does not change. A moved folder goes to the end of its new level and
+	 * takes its subfolders along.
 	 *
 	 * @param WP_REST_Request $request Request.
 	 * @return WP_REST_Response|WP_Error
@@ -262,25 +271,66 @@ class FMM_REST {
 			return self::not_found();
 		}
 
-		$name  = FMM_Taxonomy::sanitize_name( $request['name'] );
-		$valid = FMM_Taxonomy::validate_name( $name );
-		if ( is_wp_error( $valid ) ) {
-			return $valid;
+		if ( ! $request->has_param( 'name' ) && ! $request->has_param( 'parent' ) ) {
+			return new WP_Error( 'fmm_nothing_to_update', __( 'Nothing to update.', 'fena-media-manager' ), array( 'status' => 400 ) );
 		}
 
-		// wp_update_term() only rejects duplicate slugs, not duplicate names.
-		foreach ( FMM_Taxonomy::get_folders() as $other ) {
-			if ( $other['id'] !== (int) $folder->term_id && $other['parent'] === (int) $folder->parent && mb_strtolower( $other['name'] ) === mb_strtolower( $name ) ) {
-				return self::term_error( new WP_Error( 'term_exists' ) );
+		$args   = array();
+		$name   = wp_specialchars_decode( $folder->name, ENT_QUOTES );
+		$parent = (int) $folder->parent;
+		$moved  = false;
+
+		if ( $request->has_param( 'name' ) ) {
+			$name  = FMM_Taxonomy::sanitize_name( $request['name'] );
+			$valid = FMM_Taxonomy::validate_name( $name );
+			if ( is_wp_error( $valid ) ) {
+				return $valid;
+			}
+			$args['name'] = $name;
+		}
+
+		if ( $request->has_param( 'parent' ) ) {
+			$target = (int) $request['parent'];
+			if ( $target && ! FMM_Taxonomy::get_folder( $target ) ) {
+				return self::not_found();
+			}
+			if ( ! FMM_Taxonomy::is_valid_parent( $folder->term_id, $target ) ) {
+				return new WP_Error( 'fmm_invalid_parent', __( 'A folder cannot be moved into itself or one of its subfolders.', 'fena-media-manager' ), array( 'status' => 400 ) );
+			}
+			if ( $target !== $parent ) {
+				$parent         = $target;
+				$moved          = true;
+				$args['parent'] = $target;
 			}
 		}
 
-		$result = wp_update_term( $folder->term_id, FMM_Taxonomy::NAME, array( 'name' => $name ) );
-		if ( is_wp_error( $result ) ) {
-			return self::term_error( $result );
+		// wp_update_term() only rejects duplicate slugs, not duplicate names. A move is checked in the target level.
+		if ( ( isset( $args['name'] ) || $moved ) && FMM_Taxonomy::name_exists( $name, $moved ? $parent : self::effective_parent( $folder ), $folder->term_id ) ) {
+			return self::term_error( new WP_Error( 'term_exists' ) );
+		}
+
+		$order = $moved ? FMM_Taxonomy::next_order( $parent ) : 0;
+		if ( $args ) {
+			$result = wp_update_term( $folder->term_id, FMM_Taxonomy::NAME, $args );
+			if ( is_wp_error( $result ) ) {
+				return self::term_error( $result );
+			}
+		}
+		if ( $moved ) {
+			update_term_meta( $folder->term_id, FMM_Taxonomy::ORDER_META, $order );
 		}
 
 		return rest_ensure_response( FMM_Taxonomy::prepare_folder( FMM_Taxonomy::get_folder( $folder->term_id ) ) );
+	}
+
+	/**
+	 * Effective parent ID of a folder: orphans count as top level.
+	 *
+	 * @param WP_Term $folder Folder term.
+	 * @return int
+	 */
+	private static function effective_parent( WP_Term $folder ) {
+		return FMM_Taxonomy::get_folder( $folder->parent ) ? (int) $folder->parent : 0;
 	}
 
 	/**
