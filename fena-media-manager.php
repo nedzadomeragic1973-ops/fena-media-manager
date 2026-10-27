@@ -22,6 +22,7 @@ define( 'FMM_URL', plugin_dir_url( FMM_FILE ) );
 require_once FMM_PATH . 'includes/class-fmm-plugin.php';
 require_once FMM_PATH . 'includes/class-fmm-taxonomy.php';
 require_once FMM_PATH . 'includes/class-fmm-settings.php';
+require_once FMM_PATH . 'includes/class-fmm-transfer.php';
 require_once FMM_PATH . 'includes/class-fmm-installer.php';
 require_once FMM_PATH . 'includes/class-fmm-rest.php';
 require_once FMM_PATH . 'includes/class-fmm-attachment-fields.php';

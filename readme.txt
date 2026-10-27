@@ -18,6 +18,8 @@ data are never changed; one file can be in several folders.
 * Folder sidebar in Media > Library (grid view) with "All Media", "Unassigned"
   and media counts per folder.
 * Subfolders in any depth, shown as a collapsible tree (collapsed on load).
+* Import and export of the folder structure (names, colors, hierarchy, manual order) as a
+  JSON file, with validation and a preview before anything is imported.
 * Settings page (Media > Fena Media Manager): default sort order, folder tree on load,
   restore last folder and a default upload folder.
 * Instant folder search in the sidebar: case- and accent-insensitive, finds nested
@@ -65,6 +67,14 @@ No. Folders are virtual. Files, URLs, attachment IDs and metadata stay unchanged
 Only the folder is removed; its media stays in the library. Subfolders move up
 one level.
 
+= What does the folder export contain? =
+
+Only the folder structure: names, hierarchy, colors and the manual order, in a
+JSON file. Media files, assignments, folder IDs, users, settings and sort
+preferences are not exported. Importing a file never changes or deletes existing
+folders or media; you see a preview first and can merge with or skip folders that
+already exist.
+
 = Which uploads use the default upload folder? =
 
 Uploads started in the media library (grid view) or in the media modal while
@@ -98,6 +108,7 @@ Return a capability that only trusted roles have, never `read` or
 * Move media between folders (drag and drop, → button) while keeping other folder assignments.
 * Uploads are assigned to the active folder.
 * Subfolders with a collapsible tree in the sidebar and indented folder lists.
+* Import/export of the folder structure with validation, preview, merge or skip of existing folders; media and assignments are not transferred.
 * Settings page with default sort order, tree on load, restore last folder and default upload folder; uploads started in "Unassigned" stay unassigned.
 * Fix: no "dependencies not registered" notice in the list view.
 * Instant folder search in the sidebar (accent/case-insensitive, finds nested subfolders, does not change the active folder).

@@ -572,14 +572,15 @@ class FMM_Taxonomy {
 
 	/**
 	 * All folders in tree order (depth first, siblings in the sort mode of
-	 * the current user) with their `depth`. Folders whose parent is missing
-	 * are shown at the top level. Same order as store.tree() in
-	 * fmm-media-filter.js.
+	 * the current user, or the given mode) with their `depth`. Folders whose
+	 * parent is missing are shown at the top level. Same order as
+	 * store.tree() in fmm-media-filter.js.
 	 *
+	 * @param string|null $mode One of SORT_MODES; defaults to the sort mode of the current user.
 	 * @return array[]
 	 */
-	public static function get_folder_tree() {
-		$children = self::group_by_parent( self::get_folders() );
+	public static function get_folder_tree( $mode = null ) {
+		$children = self::group_by_parent( self::get_folders( $mode ) );
 
 		$tree = array();
 		$walk = function ( $parent_id, $depth ) use ( &$walk, &$tree, $children ) {

@@ -162,6 +162,7 @@ class FMM_Settings {
 		}
 
 		wp_enqueue_style( 'fmm-admin', FMM_URL . 'assets/css/fmm-admin.css', array(), FMM_Library::asset_version( 'assets/css/fmm-admin.css' ) );
+		wp_enqueue_script( 'fmm-admin', FMM_URL . 'assets/js/fmm-admin.js', array(), FMM_Library::asset_version( 'assets/js/fmm-admin.js' ), true );
 	}
 
 	/**
@@ -278,6 +279,7 @@ class FMM_Settings {
 					</div>
 				</section>
 			</form>
+			<?php FMM_Transfer::render_section(); ?>
 		</div>
 		<?php
 	}

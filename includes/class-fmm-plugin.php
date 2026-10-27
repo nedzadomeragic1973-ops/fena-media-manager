@@ -24,6 +24,7 @@ class FMM_Plugin {
 		FMM_Library::init();
 		FMM_List_Mode::init();
 		FMM_Settings::init();
+		FMM_Transfer::init();
 	}
 
 	/**

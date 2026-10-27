@@ -119,6 +119,190 @@
 	box-shadow: none;
 }
 
+.fmm-settings .fmm-field__warning {
+	margin: 8px 0 0;
+	padding: 8px 10px;
+	color: #614a00;
+	font-size: 12px;
+	line-height: 1.5;
+	background: #fcf3d9;
+	border-left: 3px solid #b88a00;
+}
+
+.fmm-settings .fmm-transfer .fmm-notice {
+	margin: 0 0 16px;
+}
+
+.fmm-settings .fmm-transfer .fmm-notice ul {
+	margin: 0 0 8px 20px;
+	list-style: disc;
+}
+
+.fmm-settings .fmm-transfer input[type="file"] {
+	display: block;
+	max-width: 100%;
+	margin: 0 0 6px;
+}
+
+.fmm-settings .fmm-preview {
+	margin-top: 8px;
+	padding-top: 16px;
+	border-top: 1px solid #f0eeea;
+}
+
+.fmm-settings .fmm-preview h3 {
+	margin: 0 0 8px;
+	font-size: 14px;
+	font-weight: 600;
+	overflow-wrap: anywhere;
+}
+
+.fmm-settings .fmm-preview__summary {
+	margin: 0 0 4px;
+	padding: 4px 8px;
+	font-size: 13px;
+	border-left: 3px solid transparent;
+}
+
+.fmm-settings .fmm-preview__summary.is-selected {
+	background: #f6f5fb;
+	border-left-color: #5b4bc4;
+}
+
+.fmm-settings .fmm-legend {
+	margin: 8px 0 12px;
+	padding: 0;
+	list-style: none;
+	font-size: 12px;
+	color: #50575e;
+}
+
+.fmm-settings .fmm-legend li {
+	margin: 0 0 4px;
+}
+
+.fmm-settings .fmm-badge {
+	display: inline-block;
+	padding: 1px 8px;
+	font-size: 12px;
+	font-weight: 600;
+	line-height: 1.6;
+	border-radius: 10px;
+}
+
+.fmm-settings .fmm-badge[hidden] {
+	display: none;
+}
+
+.fmm-settings .fmm-badge--new {
+	color: #1d5c2e;
+	background: #e3f3e7;
+}
+
+.fmm-settings .fmm-badge--merge {
+	color: #1f3f86;
+	background: #e6edfb;
+}
+
+.fmm-settings .fmm-badge--skip {
+	color: #50575e;
+	background: #ececec;
+}
+
+.fmm-settings .fmm-preview__actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	gap: 16px;
+	margin: 12px 0;
+}
+
+.fmm-settings .fmm-preview__actions form {
+	margin: 0;
+}
+
+.fmm-settings .fmm-preview__strategy {
+	margin: 0 0 10px;
+	padding: 0;
+	border: 0;
+}
+
+.fmm-settings .fmm-preview__strategy legend {
+	margin: 0 0 4px;
+	padding: 0;
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.fmm-settings .fmm-preview__tree {
+	max-height: 420px;
+	margin-top: 8px;
+	padding: 8px 12px;
+	overflow: auto;
+	background: #fcfcfb;
+	border: 1px solid #e7e5e0;
+	border-radius: 4px;
+}
+
+.fmm-settings .fmm-preview__tree:focus-visible {
+	outline: 2px solid #5b4bc4;
+	outline-offset: 1px;
+}
+
+.fmm-settings .fmm-tree,
+.fmm-settings .fmm-tree ul {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.fmm-settings .fmm-tree ul {
+	margin-left: 20px;
+}
+
+.fmm-settings .fmm-tree li {
+	margin: 0;
+}
+
+.fmm-settings .fmm-tree__row {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 8px;
+	padding: 3px 0;
+	font-size: 13px;
+}
+
+.fmm-settings .fmm-tree__name {
+	overflow-wrap: anywhere;
+}
+
+.fmm-settings .fmm-swatch {
+	flex: none;
+	box-sizing: border-box;
+	width: 12px;
+	height: 12px;
+	background: var(--fmm-folder-color, #787c82);
+	border: 1px solid rgba(0, 0, 0, 0.2);
+	border-radius: 50%;
+}
+
+.fmm-settings .fmm-swatch[data-fmm-color="blue"] {
+	--fmm-folder-color: #4a72b0;
+}
+
+.fmm-settings .fmm-swatch[data-fmm-color="violet"] {
+	--fmm-folder-color: #7b61c9;
+}
+
+.fmm-settings .fmm-swatch[data-fmm-color="sand"] {
+	--fmm-folder-color: #a07e45;
+}
+
+.fmm-settings .fmm-swatch[data-fmm-color="green"] {
+	--fmm-folder-color: #5b8a66;
+}
+
 @media screen and (max-width: 782px) {
 
 	.fmm-settings .fmm-field {
