@@ -4,59 +4,51 @@
  * @package Fena_Media_Manager
  */
 
-/* Plugin palette: scoped to plugin elements, independent of the admin color scheme */
-.fmm-sidebar,
-.fmm-dialog,
-.fmm-drag-ghost {
-	--fmm-accent: #1b1b1b;
-	--fmm-hover: #2a2a2a;
-	--fmm-active-bg: #f3f4f4;
-	--fmm-border: #e5e5e5;
-	--fmm-muted: #6b6b6b;
-	--fmm-color-gray: #787c82;
-	--fmm-color-blue: #4a72b0;
-	--fmm-color-violet: #7b61c9;
-	--fmm-color-sand: #a07e45;
-	--fmm-color-green: #5b8a66;
-}
-
 /* Plugin buttons (core button classes, scoped by plugin class) */
 .fmm-sidebar .button.fmm-sidebar__new,
 .fmm-form .button.fmm-form-cancel {
-	color: var(--fmm-accent);
-	background: #fff;
-	border-color: var(--fmm-accent);
+	color: var(--fmm-primary);
+	background: var(--fmm-surface);
+	border-color: var(--fmm-primary);
 }
 
 .fmm-sidebar .button.fmm-sidebar__new:hover,
 .fmm-form .button.fmm-form-cancel:hover {
-	color: var(--fmm-hover);
-	background: var(--fmm-active-bg);
-	border-color: var(--fmm-hover);
+	color: var(--fmm-primary-hover);
+	background: var(--fmm-surface-muted);
+	border-color: var(--fmm-primary-hover);
 }
 
 .fmm-form .button.button-primary {
-	color: #fff;
-	background: var(--fmm-accent);
-	border-color: var(--fmm-accent);
+	color: var(--fmm-on-primary);
+	background: var(--fmm-primary);
+	border-color: var(--fmm-primary);
 }
 
 .fmm-form .button.button-primary:hover {
-	color: #fff;
-	background: var(--fmm-hover);
-	border-color: var(--fmm-hover);
+	color: var(--fmm-on-primary);
+	background: var(--fmm-primary-hover);
+	border-color: var(--fmm-primary-hover);
 }
 
 .fmm-sidebar .button.fmm-sidebar__new:focus,
 .fmm-form .button.fmm-form-cancel:focus,
 .fmm-form .button.button-primary:focus {
-	border-color: var(--fmm-accent);
-	outline: 2px solid transparent;
-	box-shadow: 0 0 0 1px #fff, 0 0 0 3px var(--fmm-accent);
+	outline: 0;
+	box-shadow: none;
+}
+
+.fmm-sidebar .button.fmm-sidebar__new:focus-visible,
+.fmm-form .button.fmm-form-cancel:focus-visible,
+.fmm-form .button.button-primary:focus-visible {
+	outline: var(--fmm-focus-width) solid var(--fmm-focus);
+	outline-offset: 2px;
+	box-shadow: none;
 }
 
 .fmm-form .fmm-form__input:focus {
 	border-color: var(--fmm-accent);
+	outline: 2px solid transparent;
 	box-shadow: 0 0 0 1px var(--fmm-accent);
 }
 
@@ -78,9 +70,9 @@
 	box-sizing: border-box;
 	margin-top: 10px;
 	padding: 12px 0;
-	background: #fff;
+	background: var(--fmm-surface);
 	border: 1px solid var(--fmm-border);
-	box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+	box-shadow: var(--fmm-shadow-sm);
 }
 
 .fmm-sidebar__header {
@@ -89,7 +81,7 @@
 	justify-content: space-between;
 	gap: 8px;
 	padding: 0 12px 10px;
-	border-bottom: 1px solid #f0f0f1;
+	border-bottom: 1px solid var(--fmm-surface-muted);
 }
 
 .fmm-sidebar__title {
@@ -126,25 +118,27 @@
 
 .fmm-search .fmm-search__input:focus {
 	border-color: var(--fmm-accent);
+	outline: 2px solid transparent;
 	box-shadow: 0 0 0 1px var(--fmm-accent);
 }
 
 .fmm-sidebar .fmm-search__mark {
 	padding: 0;
 	color: inherit;
-	background: rgba(123, 97, 201, 0.18);
+	background: var(--fmm-accent-soft);
 	border-radius: 2px;
+	box-shadow: 0 1px 0 var(--fmm-accent-border);
 }
 
 .fmm-sidebar .fmm-sidebar__empty {
 	padding: 8px 12px;
-	color: var(--fmm-muted);
+	color: var(--fmm-text-muted);
 	font-size: 12px;
 }
 
 .fmm-sidebar .fmm-folder-toggle:disabled,
 .fmm-sidebar .fmm-folder-toggle:disabled:hover {
-	color: var(--fmm-muted);
+	color: var(--fmm-text-muted);
 	cursor: default;
 }
 
@@ -181,11 +175,11 @@
 
 .fmm-sidebar__item:hover,
 .fmm-sidebar__item:focus-within {
-	background: #f6f7f7;
+	background: var(--fmm-surface-subtle);
 }
 
 .fmm-sidebar__item.is-active {
-	background: var(--fmm-active-bg);
+	background: var(--fmm-accent-soft);
 	border-left-color: var(--fmm-accent);
 }
 
@@ -203,7 +197,7 @@
 	height: 24px;
 	margin-left: 4px;
 	padding: 0;
-	color: var(--fmm-muted);
+	color: var(--fmm-text-muted);
 	background: none;
 	border: 0;
 	border-radius: 2px;
@@ -215,12 +209,16 @@
 }
 
 .fmm-sidebar .fmm-folder-toggle:hover {
-	color: var(--fmm-hover);
+	color: var(--fmm-primary-hover);
 }
 
 .fmm-sidebar .fmm-folder-toggle:focus {
-	color: var(--fmm-accent);
-	outline: 2px solid var(--fmm-accent);
+	outline: 0;
+	box-shadow: none;
+}
+
+.fmm-sidebar .fmm-folder-toggle:focus-visible {
+	outline: var(--fmm-focus-width) solid var(--fmm-focus);
 	outline-offset: 0;
 	box-shadow: none;
 }
@@ -242,7 +240,7 @@
 	gap: 8px;
 	min-width: 0;
 	padding: 7px 9px;
-	color: #1d2327;
+	color: var(--fmm-text-body);
 	font-size: 13px;
 	line-height: 1.4;
 	text-align: left;
@@ -252,23 +250,24 @@
 }
 
 .fmm-sidebar__item.is-active .fmm-folder {
-	color: var(--fmm-accent);
+	color: var(--fmm-text);
 	font-weight: 600;
 }
 
 .fmm-folder:focus {
-	outline: 2px solid var(--fmm-accent);
+	outline: 0;
+	box-shadow: none;
+}
+
+.fmm-folder:focus-visible {
+	outline: var(--fmm-focus-width) solid var(--fmm-focus);
 	outline-offset: -2px;
 	box-shadow: none;
 }
 
 .fmm-folder .dashicons {
 	flex: none;
-	color: #8c8f94;
-}
-
-.fmm-sidebar__item.is-active .fmm-folder .dashicons {
-	color: inherit;
+	color: var(--fmm-text-muted);
 }
 
 /* Folder colors: only the icon of real folders, in every row state */
@@ -302,7 +301,7 @@
 
 .fmm-folder__count {
 	flex: none;
-	color: var(--fmm-muted);
+	color: var(--fmm-text-muted);
 	font-size: 12px;
 	font-weight: 400;
 }
@@ -357,20 +356,25 @@
 .fmm-sidebar .fmm-folder__actions .button-link,
 .fmm-sidebar .fmm-folder__assign .button-link {
 	padding: 4px 3px;
-	color: var(--fmm-muted);
+	color: var(--fmm-text-muted);
 	text-decoration: none;
 	border-radius: 2px;
 }
 
 .fmm-sidebar .fmm-folder__actions .button-link:hover,
 .fmm-sidebar .fmm-folder__assign .button-link:hover {
-	color: var(--fmm-hover);
+	color: var(--fmm-primary-hover);
 }
 
 .fmm-sidebar .fmm-folder__actions .button-link:focus,
 .fmm-sidebar .fmm-folder__assign .button-link:focus {
-	color: var(--fmm-accent);
-	outline: 2px solid var(--fmm-accent);
+	outline: 0;
+	box-shadow: none;
+}
+
+.fmm-sidebar .fmm-folder__actions .button-link:focus-visible,
+.fmm-sidebar .fmm-folder__assign .button-link:focus-visible {
+	outline: var(--fmm-focus-width) solid var(--fmm-focus);
 	outline-offset: 0;
 	box-shadow: none;
 }
@@ -379,7 +383,7 @@
 .fmm-sidebar .fmm-menu .fmm-folder-delete:focus,
 .fmm-sidebar .fmm-folder__assign .fmm-folder-remove:hover,
 .fmm-sidebar .fmm-folder__assign .fmm-folder-remove:focus {
-	color: #d63638;
+	color: var(--fmm-danger);
 }
 
 .fmm-folder__actions .dashicons,
@@ -397,9 +401,9 @@
 	z-index: 20;
 	min-width: 160px;
 	padding: 4px 0;
-	background: #fff;
+	background: var(--fmm-surface);
 	border: 1px solid var(--fmm-border);
-	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+	box-shadow: var(--fmm-shadow-popover);
 }
 
 .fmm-sidebar .fmm-menu__item {
@@ -409,7 +413,7 @@
 	width: 100%;
 	margin: 0;
 	padding: 6px 12px;
-	color: #1d2327;
+	color: var(--fmm-text-body);
 	font-size: 13px;
 	line-height: 1.4;
 	text-align: left;
@@ -420,14 +424,18 @@
 }
 
 .fmm-sidebar .fmm-menu__item:hover {
-	color: var(--fmm-hover);
-	background: var(--fmm-active-bg);
+	color: var(--fmm-primary-hover);
+	background: var(--fmm-surface-muted);
 }
 
 .fmm-sidebar .fmm-menu__item:focus {
-	color: var(--fmm-accent);
-	background: var(--fmm-active-bg);
-	outline: 2px solid var(--fmm-accent);
+	background: var(--fmm-surface-muted);
+	outline: 0;
+	box-shadow: none;
+}
+
+.fmm-sidebar .fmm-menu__item:focus-visible {
+	outline: var(--fmm-focus-width) solid var(--fmm-focus);
 	outline-offset: -2px;
 	box-shadow: none;
 }
@@ -436,7 +444,7 @@
 	width: 16px;
 	height: 16px;
 	font-size: 16px;
-	color: var(--fmm-muted);
+	color: var(--fmm-text-muted);
 }
 
 .fmm-sidebar .fmm-menu .fmm-folder-delete:hover .dashicons,
@@ -447,27 +455,23 @@
 .fmm-sidebar__selection {
 	margin: 10px 12px 0;
 	padding: 8px 10px;
-	color: #1d2327;
+	color: var(--fmm-text-body);
 	font-size: 12px;
 	line-height: 1.5;
-	background: var(--fmm-active-bg);
+	background: var(--fmm-surface-muted);
 	border-left: 3px solid var(--fmm-accent);
 }
 
 /* Drag-and-drop target */
 .fmm-sidebar__item.is-drop-target {
-	background: var(--fmm-active-bg);
+	background: var(--fmm-surface-muted);
 	outline: 1px dashed var(--fmm-accent);
 	outline-offset: -1px;
 }
 
-.fmm-sidebar__item.is-drop-target .fmm-folder .dashicons {
-	color: var(--fmm-accent);
-}
-
 /* Drag-and-drop folder reordering and moving into a folder */
 .fmm-sidebar__item.is-drop-into {
-	background: var(--fmm-active-bg);
+	background: var(--fmm-surface-muted);
 	outline: 1px dashed var(--fmm-accent);
 	outline-offset: -1px;
 }
@@ -493,9 +497,9 @@
 	top: -100px;
 	left: -100px;
 	padding: 4px 10px;
-	color: #fff;
+	color: var(--fmm-on-primary);
 	font-size: 12px;
-	background: var(--fmm-accent);
+	background: var(--fmm-primary);
 	border-radius: 2px;
 }
 
@@ -508,10 +512,10 @@
 	box-sizing: border-box;
 	width: min(420px, calc(100vw - 32px));
 	padding: 20px;
-	color: #1d2327;
-	background: #fff;
+	color: var(--fmm-text-body);
+	background: var(--fmm-surface);
 	border: 1px solid var(--fmm-border);
-	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+	box-shadow: var(--fmm-shadow-dialog);
 }
 
 .fmm-dialog::backdrop {
@@ -543,7 +547,7 @@
 
 .fmm-dialog .fmm-dialog__error {
 	margin: 0 0 12px;
-	color: #d63638;
+	color: var(--fmm-danger);
 }
 
 .fmm-dialog .fmm-dialog__footer {
@@ -554,39 +558,46 @@
 }
 
 .fmm-dialog .button.fmm-dialog__cancel {
-	color: var(--fmm-accent);
-	background: #fff;
-	border-color: var(--fmm-accent);
+	color: var(--fmm-primary);
+	background: var(--fmm-surface);
+	border-color: var(--fmm-primary);
 }
 
 .fmm-dialog .button.fmm-dialog__cancel:hover {
-	color: var(--fmm-hover);
-	background: var(--fmm-active-bg);
-	border-color: var(--fmm-hover);
+	color: var(--fmm-primary-hover);
+	background: var(--fmm-surface-muted);
+	border-color: var(--fmm-primary-hover);
 }
 
 .fmm-dialog .button.button-primary {
-	color: #fff;
-	background: var(--fmm-accent);
-	border-color: var(--fmm-accent);
+	color: var(--fmm-on-primary);
+	background: var(--fmm-primary);
+	border-color: var(--fmm-primary);
 }
 
 .fmm-dialog .button.button-primary:hover {
-	color: #fff;
-	background: var(--fmm-hover);
-	border-color: var(--fmm-hover);
+	color: var(--fmm-on-primary);
+	background: var(--fmm-primary-hover);
+	border-color: var(--fmm-primary-hover);
 }
 
 .fmm-dialog .button.fmm-dialog__cancel:focus,
 .fmm-dialog .button.button-primary:focus {
-	border-color: var(--fmm-accent);
-	outline: 2px solid transparent;
-	box-shadow: 0 0 0 1px #fff, 0 0 0 3px var(--fmm-accent);
+	outline: 0;
+	box-shadow: none;
+}
+
+.fmm-dialog .button.fmm-dialog__cancel:focus-visible,
+.fmm-dialog .button.button-primary:focus-visible {
+	outline: var(--fmm-focus-width) solid var(--fmm-focus);
+	outline-offset: 2px;
+	box-shadow: none;
 }
 
 .fmm-dialog .fmm-dialog__field select:focus,
 .fmm-dialog .fmm-dialog__field input:focus {
 	border-color: var(--fmm-accent);
+	outline: 2px solid transparent;
 	box-shadow: 0 0 0 1px var(--fmm-accent);
 }
 
@@ -636,7 +647,13 @@
 
 .fmm-dialog .fmm-dialog__color input[type="color"]:focus,
 .fmm-dialog .fmm-dialog__color input[type="radio"]:focus {
-	outline: 2px solid var(--fmm-accent);
+	outline: 0;
+	box-shadow: none;
+}
+
+.fmm-dialog .fmm-dialog__color input[type="color"]:focus-visible,
+.fmm-dialog .fmm-dialog__color input[type="radio"]:focus-visible {
+	outline: var(--fmm-focus-width) solid var(--fmm-focus);
 	outline-offset: 1px;
 	box-shadow: none;
 }

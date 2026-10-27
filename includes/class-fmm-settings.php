@@ -161,7 +161,8 @@ class FMM_Settings {
 			return;
 		}
 
-		wp_enqueue_style( 'fmm-admin', FMM_URL . 'assets/css/fmm-admin.css', array(), FMM_Library::asset_version( 'assets/css/fmm-admin.css' ) );
+		FMM_Library::register_tokens();
+		wp_enqueue_style( 'fmm-admin', FMM_URL . 'assets/css/fmm-admin.css', array( 'fmm-tokens' ), FMM_Library::asset_version( 'assets/css/fmm-admin.css' ) );
 		wp_enqueue_script( 'fmm-admin', FMM_URL . 'assets/js/fmm-admin.js', array(), FMM_Library::asset_version( 'assets/js/fmm-admin.js' ), true );
 	}
 
@@ -211,7 +212,7 @@ class FMM_Settings {
 		$upload_to = (int) self::get( 'upload_folder' );
 		$name      = self::OPTION;
 		?>
-		<div class="wrap fmm-settings">
+		<div class="wrap fmm fmm-settings">
 			<h1><?php esc_html_e( 'Fena Media Manager', 'fena-media-manager' ); ?></h1>
 			<?php settings_errors(); ?>
 			<form method="post" action="options.php">

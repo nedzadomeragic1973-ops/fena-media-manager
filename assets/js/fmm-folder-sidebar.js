@@ -127,7 +127,7 @@
 		}
 		this.restoreFolder();
 
-		this.$el = $( '<nav class="fmm-sidebar"></nav>' ).attr( 'aria-label', __( 'Folders', 'fena-media-manager' ) );
+		this.$el = $( '<nav class="fmm fmm-sidebar"></nav>' ).attr( 'aria-label', __( 'Folders', 'fena-media-manager' ) );
 		this.$el.append(
 			$( '<div class="fmm-sidebar__header"></div>' ).append(
 				$( '<h2 class="fmm-sidebar__title"></h2>' ).text( __( 'Folders', 'fena-media-manager' ) ),
@@ -680,7 +680,7 @@
 				return;
 			}
 			/* translators: %d: number of media files. */
-			ghost = $( '<div class="fmm-drag-ghost"></div>' ).text( sprintf( _n( '%d media file', '%d media files', count, 'fena-media-manager' ), count ) ).appendTo( document.body );
+			ghost = $( '<div class="fmm fmm-drag-ghost"></div>' ).text( sprintf( _n( '%d media file', '%d media files', count, 'fena-media-manager' ), count ) ).appendTo( document.body );
 			dt.setDragImage( ghost[ 0 ], 12, 12 );
 			setTimeout( function() {
 				ghost.remove();
@@ -875,7 +875,7 @@
 		dialog: function( options ) {
 			var self = this;
 			var titleId = 'fmm-dialog-title';
-			var $dialog = $( '<dialog class="fmm-dialog"></dialog>' ).attr( 'aria-labelledby', titleId );
+			var $dialog = $( '<dialog class="fmm fmm-dialog"></dialog>' ).attr( 'aria-labelledby', titleId );
 			var $error = $( '<p class="fmm-dialog__error" role="alert" hidden></p>' );
 			var $submit = $( '<button type="submit" class="button button-primary"></button>' ).text( options.submit );
 			var api = {

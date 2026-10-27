@@ -71,6 +71,16 @@ class FMM_Library {
 	}
 
 	/**
+	 * Registers the shared design token stylesheet (dependency of the
+	 * plugin styles; every token is scoped to the .fmm class).
+	 */
+	public static function register_tokens() {
+		if ( ! wp_style_is( 'fmm-tokens', 'registered' ) ) {
+			wp_register_style( 'fmm-tokens', FMM_URL . 'assets/css/fmm-tokens.css', array(), self::asset_version( 'assets/css/fmm-tokens.css' ) );
+		}
+	}
+
+	/**
 	 * Enqueues the folder store and the modal folder filter. Runs inside
 	 * wp_enqueue_media(), so it covers the media library, the Customizer,
 	 * the block editor and every meta box that opens the media modal.
@@ -80,7 +90,8 @@ class FMM_Library {
 			return;
 		}
 
-		wp_enqueue_style( 'fmm-media', FMM_URL . 'assets/css/fmm-media.css', array(), self::asset_version( 'assets/css/fmm-media.css' ) );
+		self::register_tokens();
+		wp_enqueue_style( 'fmm-media', FMM_URL . 'assets/css/fmm-media.css', array( 'fmm-tokens' ), self::asset_version( 'assets/css/fmm-media.css' ) );
 		wp_enqueue_script(
 			'fmm-media-filter',
 			FMM_URL . 'assets/js/fmm-media-filter.js',
@@ -116,7 +127,8 @@ class FMM_Library {
 			return;
 		}
 
-		wp_enqueue_style( 'fmm-media', FMM_URL . 'assets/css/fmm-media.css', array(), self::asset_version( 'assets/css/fmm-media.css' ) );
+		self::register_tokens();
+		wp_enqueue_style( 'fmm-media', FMM_URL . 'assets/css/fmm-media.css', array( 'fmm-tokens' ), self::asset_version( 'assets/css/fmm-media.css' ) );
 		wp_enqueue_script(
 			'fmm-folder-sidebar',
 			FMM_URL . 'assets/js/fmm-folder-sidebar.js',

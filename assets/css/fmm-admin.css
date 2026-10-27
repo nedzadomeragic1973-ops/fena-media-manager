@@ -6,14 +6,14 @@
 
 .fmm-settings {
 	max-width: 760px;
-	color: #1d2327;
+	color: var(--fmm-text-body);
 }
 
 .fmm-settings .fmm-card {
 	margin: 16px 0;
 	padding: 24px;
-	background: #fff;
-	border: 1px solid #e7e5e0;
+	background: var(--fmm-surface);
+	border: 1px solid var(--fmm-border);
 	border-radius: 6px;
 }
 
@@ -32,7 +32,7 @@
 	margin: 0;
 	padding: 14px 0;
 	border: 0;
-	border-top: 1px solid #f0eeea;
+	border-top: 1px solid var(--fmm-border);
 }
 
 .fmm-settings .fmm-card h2 + .fmm-field {
@@ -78,7 +78,7 @@
 
 .fmm-settings .fmm-field__help {
 	margin: 6px 0 0;
-	color: #646970;
+	color: var(--fmm-text-muted);
 	font-size: 12px;
 	line-height: 1.5;
 }
@@ -86,35 +86,35 @@
 .fmm-settings .fmm-card__footer {
 	margin: 8px 0 0;
 	padding: 16px 0 0;
-	border-top: 1px solid #f0eeea;
+	border-top: 1px solid var(--fmm-border);
 }
 
 .fmm-settings input[type="radio"]:focus-visible,
 .fmm-settings input[type="checkbox"]:focus-visible,
 .fmm-settings select:focus-visible {
-	border-color: #5b4bc4;
-	outline: 2px solid #5b4bc4;
+	border-color: var(--fmm-accent);
+	outline: var(--fmm-focus-width) solid var(--fmm-focus);
 	outline-offset: 1px;
 	box-shadow: none;
 }
 
 .fmm-settings .button-primary {
-	color: #fff;
-	background: #5b4bc4;
-	border-color: #5b4bc4;
+	color: var(--fmm-on-primary);
+	background: var(--fmm-primary);
+	border-color: var(--fmm-primary);
 }
 
 .fmm-settings .button-primary:hover {
-	color: #fff;
-	background: #4a3ba8;
-	border-color: #4a3ba8;
+	color: var(--fmm-on-primary);
+	background: var(--fmm-primary-hover);
+	border-color: var(--fmm-primary-hover);
 }
 
 .fmm-settings .button-primary:focus-visible {
-	color: #fff;
-	background: #4a3ba8;
-	border-color: #4a3ba8;
-	outline: 2px solid #5b4bc4;
+	color: var(--fmm-on-primary);
+	background: var(--fmm-primary-hover);
+	border-color: var(--fmm-primary-hover);
+	outline: var(--fmm-focus-width) solid var(--fmm-focus);
 	outline-offset: 2px;
 	box-shadow: none;
 }
@@ -122,11 +122,11 @@
 .fmm-settings .fmm-field__warning {
 	margin: 8px 0 0;
 	padding: 8px 10px;
-	color: #614a00;
+	color: var(--fmm-warning);
 	font-size: 12px;
 	line-height: 1.5;
-	background: #fcf3d9;
-	border-left: 3px solid #b88a00;
+	background: var(--fmm-warning-soft);
+	border-left: 3px solid var(--fmm-warning);
 }
 
 .fmm-settings .fmm-transfer .fmm-notice {
@@ -147,7 +147,7 @@
 .fmm-settings .fmm-preview {
 	margin-top: 8px;
 	padding-top: 16px;
-	border-top: 1px solid #f0eeea;
+	border-top: 1px solid var(--fmm-border);
 }
 
 .fmm-settings .fmm-preview h3 {
@@ -165,8 +165,8 @@
 }
 
 .fmm-settings .fmm-preview__summary.is-selected {
-	background: #f6f5fb;
-	border-left-color: #5b4bc4;
+	background: var(--fmm-accent-soft);
+	border-left-color: var(--fmm-accent);
 }
 
 .fmm-settings .fmm-legend {
@@ -174,7 +174,7 @@
 	padding: 0;
 	list-style: none;
 	font-size: 12px;
-	color: #50575e;
+	color: var(--fmm-text-muted);
 }
 
 .fmm-settings .fmm-legend li {
@@ -195,8 +195,8 @@
 }
 
 .fmm-settings .fmm-badge--new {
-	color: #1d5c2e;
-	background: #e3f3e7;
+	color: var(--fmm-success);
+	background: var(--fmm-success-soft);
 }
 
 .fmm-settings .fmm-badge--merge {
@@ -205,8 +205,8 @@
 }
 
 .fmm-settings .fmm-badge--skip {
-	color: #50575e;
-	background: #ececec;
+	color: var(--fmm-text-muted);
+	background: var(--fmm-surface-muted);
 }
 
 .fmm-settings .fmm-preview__actions {
@@ -239,13 +239,13 @@
 	margin-top: 8px;
 	padding: 8px 12px;
 	overflow: auto;
-	background: #fcfcfb;
-	border: 1px solid #e7e5e0;
+	background: var(--fmm-surface-subtle);
+	border: 1px solid var(--fmm-border);
 	border-radius: 4px;
 }
 
 .fmm-settings .fmm-preview__tree:focus-visible {
-	outline: 2px solid #5b4bc4;
+	outline: var(--fmm-focus-width) solid var(--fmm-focus);
 	outline-offset: 1px;
 }
 
@@ -282,25 +282,25 @@
 	box-sizing: border-box;
 	width: 12px;
 	height: 12px;
-	background: var(--fmm-folder-color, #787c82);
+	background: var(--fmm-folder-color, var(--fmm-color-gray));
 	border: 1px solid rgba(0, 0, 0, 0.2);
 	border-radius: 50%;
 }
 
 .fmm-settings .fmm-swatch[data-fmm-color="blue"] {
-	--fmm-folder-color: #4a72b0;
+	--fmm-folder-color: var(--fmm-color-blue);
 }
 
 .fmm-settings .fmm-swatch[data-fmm-color="violet"] {
-	--fmm-folder-color: #7b61c9;
+	--fmm-folder-color: var(--fmm-color-violet);
 }
 
 .fmm-settings .fmm-swatch[data-fmm-color="sand"] {
-	--fmm-folder-color: #a07e45;
+	--fmm-folder-color: var(--fmm-color-sand);
 }
 
 .fmm-settings .fmm-swatch[data-fmm-color="green"] {
-	--fmm-folder-color: #5b8a66;
+	--fmm-folder-color: var(--fmm-color-green);
 }
 
 @media screen and (max-width: 782px) {

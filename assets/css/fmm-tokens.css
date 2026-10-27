@@ -1,0 +1,84 @@
+/**
+ * Fena Media Manager: design tokens. Every token is scoped to the .fmm root
+ * class, independent of the admin color scheme and of any theme.
+ *
+ * @package Fena_Media_Manager
+ */
+
+.fmm {
+
+	/* Surfaces */
+	--fmm-surface: #fff;
+	--fmm-surface-subtle: #f8fafc;
+	--fmm-surface-muted: #f1f5f9;
+
+	/* Borders */
+	--fmm-border: #e2e8f0;
+	--fmm-border-strong: #cbd5e1;
+
+	/* Text */
+	--fmm-text: #0f172a;
+	--fmm-text-body: #1e293b;
+	--fmm-text-muted: #5b6b80;
+
+	/* Primary (dark buttons) */
+	--fmm-primary: #1e293b;
+	--fmm-primary-hover: #334155;
+	--fmm-on-primary: #fff;
+
+	/* Accent (selected and active state, focus) */
+	--fmm-accent: #6d4fd8;
+	--fmm-accent-soft: #f5f3ff;
+	--fmm-accent-border: #ddd6fe;
+
+	/* Focus */
+	--fmm-focus: var(--fmm-accent);
+	--fmm-focus-width: 2px;
+
+	/* Status */
+	--fmm-danger: #b91c1c;
+	--fmm-danger-soft: #fef2f2;
+	--fmm-danger-border: #fecaca;
+	--fmm-success: #047857;
+	--fmm-success-soft: #ecfdf5;
+	--fmm-warning: #b45309;
+	--fmm-warning-soft: #fffbeb;
+
+	/* Radius */
+	--fmm-radius-container: 16px;
+	--fmm-radius-card: 12px;
+	--fmm-radius-control: 8px;
+	--fmm-radius-small: 6px;
+	--fmm-radius-pill: 999px;
+
+	/* Shadow */
+	--fmm-shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.04);
+	--fmm-shadow-md: 0 4px 12px rgba(15, 23, 42, 0.06);
+	--fmm-shadow-popover: 0 8px 24px rgba(15, 23, 42, 0.12);
+	--fmm-shadow-dialog: 0 25px 50px rgba(15, 23, 42, 0.25);
+
+	/* Motion */
+	--fmm-transition: 0.15s ease;
+
+	/* Folder colors (stored by name; values must not change) */
+	--fmm-color-gray: #787c82;
+	--fmm-color-blue: #4a72b0;
+	--fmm-color-violet: #7b61c9;
+	--fmm-color-sand: #a07e45;
+	--fmm-color-green: #5b8a66;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+	.fmm {
+		--fmm-transition: 0s;
+	}
+}
+
+@media (forced-colors: active) {
+
+	.fmm .fmm-sidebar__item.is-active {
+		outline: 1px solid CanvasText;
+		outline-offset: -1px;
+	}
+}
