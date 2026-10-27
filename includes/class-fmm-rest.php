@@ -85,6 +85,50 @@ class FMM_REST {
 
 		register_rest_route(
 			self::NAMESPACE_V1,
+			'/folders/order',
+			array(
+				'methods'             => WP_REST_Server::CREATABLE,
+				'callback'            => array( __CLASS__, 'reorder_folders' ),
+				'permission_callback' => array( 'FMM_Taxonomy', 'can_manage' ),
+				'args'                => array(
+					'parent' => array(
+						'type'    => 'integer',
+						'minimum' => 0,
+						'default' => 0,
+					),
+					'ids'    => array(
+						'type'     => 'array',
+						'required' => true,
+						'minItems' => 1,
+						'maxItems' => 2000,
+						'items'    => array(
+							'type'    => 'integer',
+							'minimum' => 1,
+						),
+					),
+				),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE_V1,
+			'/preferences',
+			array(
+				'methods'             => WP_REST_Server::CREATABLE,
+				'callback'            => array( __CLASS__, 'set_preferences' ),
+				'permission_callback' => array( 'FMM_Taxonomy', 'can_read' ),
+				'args'                => array(
+					'sort' => array(
+						'type'     => 'string',
+						'required' => true,
+						'enum'     => FMM_Taxonomy::SORT_MODES,
+					),
+				),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE_V1,
 			'/assign',
 			array(
 				'methods'             => WP_REST_Server::CREATABLE,
@@ -161,15 +205,49 @@ class FMM_REST {
 			return self::not_found();
 		}
 
+		$order  = FMM_Taxonomy::next_order( $parent );
 		$result = wp_insert_term( $name, FMM_Taxonomy::NAME, array( 'parent' => $parent ) );
 		if ( is_wp_error( $result ) ) {
 			return self::term_error( $result );
 		}
+		update_term_meta( $result['term_id'], FMM_Taxonomy::ORDER_META, $order );
 
 		$response = rest_ensure_response( FMM_Taxonomy::prepare_folder( FMM_Taxonomy::get_folder( $result['term_id'] ) ) );
 		$response->set_status( 201 );
 
 		return $response;
+	}
+
+	/**
+	 * POST /folders/order. Stores the manual order of the folders below `parent`.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function reorder_folders( WP_REST_Request $request ) {
+		$parent = (int) $request['parent'];
+		if ( $parent && ! FMM_Taxonomy::get_folder( $parent ) ) {
+			return self::not_found();
+		}
+
+		$result = FMM_Taxonomy::reorder( $parent, $request['ids'] );
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		return rest_ensure_response( FMM_Library::get_summary() );
+	}
+
+	/**
+	 * POST /preferences. Saves the folder sort mode of the current user.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response
+	 */
+	public static function set_preferences( WP_REST_Request $request ) {
+		FMM_Taxonomy::set_sort_mode( $request['sort'] );
+
+		return rest_ensure_response( FMM_Library::get_summary() );
 	}
 
 	/**

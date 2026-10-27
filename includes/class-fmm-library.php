@@ -113,13 +113,14 @@ class FMM_Library {
 	}
 
 	/**
-	 * Folders plus the "All Media" and "Unassigned" counts.
+	 * Folders (in the sort mode of the current user) plus the "All Media" and "Unassigned" counts.
 	 *
 	 * @return array
 	 */
 	public static function get_summary() {
 		return array(
 			'folders'    => FMM_Taxonomy::get_folders(),
+			'sort'       => FMM_Taxonomy::sort_mode(),
 			'total'      => self::count_attachments(),
 			'unassigned' => self::count_attachments( array( self::tax_clause( 'none' ) ) ),
 		);

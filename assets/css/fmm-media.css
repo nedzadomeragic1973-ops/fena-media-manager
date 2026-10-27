@@ -104,6 +104,19 @@
 	font-size: 16px;
 }
 
+/* Sort mode */
+.fmm-sort {
+	padding: 8px 12px 0;
+}
+
+.fmm-sort .fmm-sort__select {
+	width: 100%;
+	max-width: none;
+	min-height: 28px;
+	font-size: 12px;
+	line-height: 1.5;
+}
+
 .fmm-sidebar__notice.notice {
 	margin: 10px 12px 0;
 }
@@ -229,7 +242,7 @@
 	font-weight: 400;
 }
 
-/* Rename/delete: always in the DOM and focusable, shown in place of the count on hover/focus */
+/* Subfolder and menu buttons: always in the DOM and focusable, shown in place of the count on hover/focus */
 .fmm-folder__actions {
 	position: absolute;
 	top: 50%;
@@ -243,24 +256,27 @@
 }
 
 .fmm-sidebar__item:hover .fmm-folder__actions,
-.fmm-sidebar__item:focus-within .fmm-folder__actions {
+.fmm-sidebar__item:focus-within .fmm-folder__actions,
+.fmm-sidebar__item.is-menu-open .fmm-folder__actions {
 	opacity: 1;
 }
 
 /*
  * While the actions are shown, the folder button gives up their width
- * (3 buttons of 22px + 4px gap + 6px offset) so the name ends with an
+ * (2 buttons of 22px + 4px gap + 6px offset) so the name ends with an
  * ellipsis before them instead of running underneath.
  */
 @media screen and (min-width: 783px) {
 
 	.fmm-sidebar__item:has(.fmm-folder__actions):hover .fmm-folder,
-	.fmm-sidebar__item:has(.fmm-folder__actions):focus-within .fmm-folder {
-		padding-right: 76px;
+	.fmm-sidebar__item:has(.fmm-folder__actions):focus-within .fmm-folder,
+	.fmm-sidebar__item.is-menu-open .fmm-folder {
+		padding-right: 54px;
 	}
 
 	.fmm-sidebar__item:has(.fmm-folder__actions):hover .fmm-folder__count,
-	.fmm-sidebar__item:has(.fmm-folder__actions):focus-within .fmm-folder__count {
+	.fmm-sidebar__item:has(.fmm-folder__actions):focus-within .fmm-folder__count,
+	.fmm-sidebar__item.is-menu-open .fmm-folder__count {
 		display: none;
 	}
 }
@@ -294,8 +310,8 @@
 	box-shadow: none;
 }
 
-.fmm-sidebar .fmm-folder__actions .fmm-folder-delete:hover,
-.fmm-sidebar .fmm-folder__actions .fmm-folder-delete:focus,
+.fmm-sidebar .fmm-menu .fmm-folder-delete:hover,
+.fmm-sidebar .fmm-menu .fmm-folder-delete:focus,
 .fmm-sidebar .fmm-folder__assign .fmm-folder-remove:hover,
 .fmm-sidebar .fmm-folder__assign .fmm-folder-remove:focus {
 	color: #d63638;
@@ -306,6 +322,61 @@
 	width: 16px;
 	height: 16px;
 	font-size: 16px;
+}
+
+/* Actions menu (inline disclosure inside the folder row) */
+.fmm-sidebar .fmm-menu {
+	position: absolute;
+	top: 100%;
+	right: 6px;
+	z-index: 20;
+	min-width: 160px;
+	padding: 4px 0;
+	background: #fff;
+	border: 1px solid var(--fmm-border);
+	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
+.fmm-sidebar .fmm-menu__item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	margin: 0;
+	padding: 6px 12px;
+	color: #1d2327;
+	font-size: 13px;
+	line-height: 1.4;
+	text-align: left;
+	background: none;
+	border: 0;
+	border-radius: 0;
+	cursor: pointer;
+}
+
+.fmm-sidebar .fmm-menu__item:hover {
+	color: var(--fmm-hover);
+	background: var(--fmm-active-bg);
+}
+
+.fmm-sidebar .fmm-menu__item:focus {
+	color: var(--fmm-accent);
+	background: var(--fmm-active-bg);
+	outline: 2px solid var(--fmm-accent);
+	outline-offset: -2px;
+	box-shadow: none;
+}
+
+.fmm-menu__item .dashicons {
+	width: 16px;
+	height: 16px;
+	font-size: 16px;
+	color: var(--fmm-muted);
+}
+
+.fmm-sidebar .fmm-menu .fmm-folder-delete:hover .dashicons,
+.fmm-sidebar .fmm-menu .fmm-folder-delete:focus .dashicons {
+	color: inherit;
 }
 
 .fmm-sidebar__selection {
@@ -327,6 +398,23 @@
 
 .fmm-sidebar__item.is-drop-target .fmm-folder .dashicons {
 	color: var(--fmm-accent);
+}
+
+/* Drag-and-drop folder reordering */
+.fmm-sidebar__item.is-drop-before {
+	box-shadow: inset 0 2px 0 var(--fmm-accent);
+}
+
+.fmm-sidebar__item.is-drop-after {
+	box-shadow: inset 0 -2px 0 var(--fmm-accent);
+}
+
+.fmm-sidebar .fmm-folder[draggable="true"] {
+	cursor: grab;
+}
+
+.fmm-sidebar.is-dragging-folder .fmm-folder[draggable="true"] {
+	cursor: grabbing;
 }
 
 .fmm-drag-ghost {

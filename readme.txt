@@ -18,6 +18,9 @@ data are never changed; one file can be in several folders.
 * Folder sidebar in Media > Library (grid view) with "All Media", "Unassigned"
   and media counts per folder.
 * Subfolders in any depth, shown as a collapsible tree (collapsed on load).
+* Folder sorting among siblings: name A–Z or Z–A, newest or oldest first, or manual
+  order (drag and drop or "Move up"/"Move down"). The sort mode is a per-user
+  setting; the manual order is shared by all users.
 * Folder filter in the grid, in the list view and in the media modal, so it is
   also available in the Customizer and in the block editor.
 * Uploads go into the active folder (single and multiple files, media library
@@ -79,6 +82,7 @@ Return a capability that only trusted roles have, never `read` or
 * Move media between folders (drag and drop, → button) while keeping other folder assignments.
 * Uploads are assigned to the active folder.
 * Subfolders with a collapsible tree in the sidebar and indented folder lists.
+* Folder sorting (A–Z, Z–A, newest, oldest, manual order) with a per-user sort mode.
 * Folder checkboxes in the attachment details.
 * Folders can only be assigned to attachments; assignments to posts, pages and other post types are removed.
 * Asset versions use the file modification time in local and development environments.

@@ -23,6 +23,21 @@ class FMM_Taxonomy {
 	const MAX_NAME_LENGTH = 200;
 
 	/**
+	 * Term meta key of the manual folder position among siblings.
+	 */
+	const ORDER_META = 'fmm_order';
+
+	/**
+	 * User meta key of the folder sort mode.
+	 */
+	const SORT_META = 'fmm_folder_sort';
+
+	/**
+	 * Available folder sort modes.
+	 */
+	const SORT_MODES = array( 'name_asc', 'name_desc', 'newest', 'oldest', 'manual' );
+
+	/**
 	 * Registers the taxonomy.
 	 */
 	public static function register() {
@@ -61,6 +76,53 @@ class FMM_Taxonomy {
 				),
 			)
 		);
+
+		register_term_meta(
+			self::NAME,
+			self::ORDER_META,
+			array(
+				'type'              => 'integer',
+				'single'            => true,
+				'sanitize_callback' => 'absint',
+				'show_in_rest'      => false,
+			)
+		);
+	}
+
+	/**
+	 * Folder sort mode of the current user.
+	 *
+	 * @return string One of SORT_MODES.
+	 */
+	public static function sort_mode() {
+		$mode = get_user_meta( get_current_user_id(), self::SORT_META, true );
+
+		return in_array( $mode, self::SORT_MODES, true ) ? $mode : self::default_sort_mode();
+	}
+
+	/**
+	 * Sort mode for users who have not chosen one.
+	 *
+	 * @return string One of SORT_MODES.
+	 */
+	private static function default_sort_mode() {
+		return 'name_asc';
+	}
+
+	/**
+	 * Saves the folder sort mode of the current user.
+	 *
+	 * @param string $mode One of SORT_MODES.
+	 * @return bool Whether the mode was valid and stored.
+	 */
+	public static function set_sort_mode( $mode ) {
+		if ( ! in_array( $mode, self::SORT_MODES, true ) ) {
+			return false;
+		}
+
+		update_user_meta( get_current_user_id(), self::SORT_META, $mode );
+
+		return true;
 	}
 
 	/**
@@ -293,45 +355,150 @@ class FMM_Taxonomy {
 			'name'   => wp_specialchars_decode( $term->name, ENT_QUOTES ),
 			'parent' => (int) $term->parent,
 			'count'  => (int) $term->count,
+			'order'  => (int) get_term_meta( $term->term_id, self::ORDER_META, true ),
 		);
 	}
 
 	/**
-	 * All folders, sorted by name.
+	 * All folders in the given sort mode. Newest and oldest use the term ID:
+	 * IDs are assigned in creation order and WordPress stores no term date.
+	 * Manual order sorts by the `order` meta, ties by name. Hierarchy is
+	 * applied by the callers; the order only matters among siblings.
 	 *
+	 * @param string|null $mode One of SORT_MODES; defaults to the sort mode of the current user.
 	 * @return array[]
 	 */
-	public static function get_folders() {
-		$terms = get_terms(
-			array(
-				'taxonomy'   => self::NAME,
-				'hide_empty' => false,
-				'orderby'    => 'name',
-				'order'      => 'ASC',
-			)
+	public static function get_folders( $mode = null ) {
+		$mode = in_array( $mode, self::SORT_MODES, true ) ? $mode : self::sort_mode();
+		$args = array(
+			'taxonomy'   => self::NAME,
+			'hide_empty' => false,
+			'orderby'    => 'name',
+			'order'      => 'name_desc' === $mode ? 'DESC' : 'ASC',
 		);
+
+		if ( 'newest' === $mode || 'oldest' === $mode ) {
+			$args['orderby'] = 'term_id';
+			$args['order']   = 'newest' === $mode ? 'DESC' : 'ASC';
+		}
+
+		$terms = get_terms( $args );
 
 		if ( ! is_array( $terms ) ) {
 			return array();
 		}
 
-		return array_map( array( __CLASS__, 'prepare_folder' ), $terms );
+		$folders = array_map( array( __CLASS__, 'prepare_folder' ), $terms );
+
+		if ( 'manual' === $mode ) {
+			// usort() is not stable before PHP 8: the name position is the tiebreak.
+			foreach ( $folders as $index => $folder ) {
+				$folders[ $index ]['position'] = $index;
+			}
+			usort(
+				$folders,
+				function ( $a, $b ) {
+					return array( $a['order'], $a['position'] ) <=> array( $b['order'], $b['position'] );
+				}
+			);
+			foreach ( $folders as $index => $folder ) {
+				unset( $folders[ $index ]['position'] );
+			}
+		}
+
+		return $folders;
 	}
 
 	/**
-	 * All folders in tree order (depth first, siblings by name) with their
-	 * `depth`. Folders whose parent is missing are shown at the top level.
-	 * Same order as store.tree() in fmm-media-filter.js.
+	 * Groups folders by effective parent. A folder whose parent does not
+	 * exist counts as top level (0), as in store.tree().
 	 *
-	 * @return array[]
+	 * @param array[] $folders Folders from get_folders().
+	 * @return array[] Parent ID => folders.
 	 */
-	public static function get_folder_tree() {
-		$folders  = self::get_folders();
+	private static function group_by_parent( $folders ) {
 		$ids      = wp_list_pluck( $folders, 'id' );
 		$children = array();
 		foreach ( $folders as $folder ) {
 			$children[ in_array( $folder['parent'], $ids, true ) ? $folder['parent'] : 0 ][] = $folder;
 		}
+
+		return $children;
+	}
+
+	/**
+	 * IDs of the folders directly below a parent, in folder order.
+	 *
+	 * @param int          $parent_id Parent folder ID, 0 for the top level.
+	 * @param array[]|null $folders   Folders from get_folders(); loaded when null.
+	 * @return int[]
+	 */
+	public static function child_ids( $parent_id, $folders = null ) {
+		$children = self::group_by_parent( null === $folders ? self::get_folders() : $folders );
+		$siblings = isset( $children[ (int) $parent_id ] ) ? $children[ (int) $parent_id ] : array();
+
+		return array_map( 'intval', wp_list_pluck( $siblings, 'id' ) );
+	}
+
+	/**
+	 * Manual position for a new folder: after all of its siblings.
+	 *
+	 * @param int $parent_id Parent folder ID, 0 for the top level.
+	 * @return int
+	 */
+	public static function next_order( $parent_id ) {
+		$folders = self::get_folders( 'manual' );
+		$ids     = self::child_ids( $parent_id, $folders );
+		$orders  = array();
+		foreach ( $folders as $folder ) {
+			if ( in_array( $folder['id'], $ids, true ) ) {
+				$orders[] = $folder['order'];
+			}
+		}
+
+		return $orders ? max( $orders ) + 1 : 0;
+	}
+
+	/**
+	 * Stores the manual order of the folders below a parent. The IDs must be
+	 * exactly the current children, so concurrent changes are not overwritten.
+	 *
+	 * @param int   $parent_id Parent folder ID, 0 for the top level.
+	 * @param array $ids       Folder IDs in the new order.
+	 * @return true|WP_Error
+	 */
+	public static function reorder( $parent_id, $ids ) {
+		$ids      = array_map( 'intval', (array) $ids );
+		$expected = self::child_ids( $parent_id );
+		$sorted   = $ids;
+		sort( $sorted );
+		sort( $expected );
+
+		if ( count( array_unique( $ids ) ) !== count( $ids ) || $sorted !== $expected ) {
+			return new WP_Error(
+				'fmm_order_conflict',
+				__( 'The folders have changed in the meantime. Please try again.', 'fena-media-manager' ),
+				array( 'status' => 409 )
+			);
+		}
+
+		foreach ( $ids as $position => $id ) {
+			update_term_meta( $id, self::ORDER_META, $position );
+		}
+
+		return true;
+	}
+
+	/**
+	 * All folders in tree order (depth first, siblings in the sort mode of
+	 * the current user) with their `depth`. Folders whose parent is missing
+	 * are shown at the top level. Same order as store.tree() in
+	 * fmm-media-filter.js.
+	 *
+	 * @return array[]
+	 */
+	public static function get_folder_tree() {
+		$children = self::group_by_parent( self::get_folders() );
 
 		$tree = array();
 		$walk = function ( $parent_id, $depth ) use ( &$walk, &$tree, $children ) {

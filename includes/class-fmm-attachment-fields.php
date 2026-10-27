@@ -40,7 +40,7 @@ class FMM_Attachment_Fields {
 
 		$id       = (int) $post->ID;
 		$base     = 'attachments[' . $id . ']';
-		$folders  = FMM_Taxonomy::get_folders();
+		$folders  = FMM_Taxonomy::get_folder_tree();
 		$assigned = FMM_Taxonomy::get_attachment_folder_ids( $post );
 
 		$html  = sprintf( '<input type="hidden" name="%s" value="1" />', esc_attr( $base . '[fmm_folders_present]' ) );
@@ -56,10 +56,11 @@ class FMM_Attachment_Fields {
 			$html .= '<span class="fmm-folders" role="group" aria-label="' . esc_attr__( 'Folders', 'fena-media-manager' ) . '">';
 			foreach ( $folders as $folder ) {
 				$html .= sprintf(
-					'<label style="display:block"><input type="checkbox" name="%1$s" value="1"%2$s /> %3$s</label>',
+					'<label style="display:block;padding-left:%4$dpx"><input type="checkbox" name="%1$s" value="1"%2$s /> %3$s</label>',
 					esc_attr( $base . '[fmm_folders][' . $folder['id'] . ']' ),
 					checked( in_array( $folder['id'], $assigned, true ), true, false ),
-					esc_html( $folder['name'] )
+					esc_html( $folder['name'] ),
+					(int) $folder['depth'] * 16
 				);
 			}
 			$html .= '</span>';

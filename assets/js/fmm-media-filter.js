@@ -32,12 +32,16 @@
 		folders: [],
 		total: 0,
 		unassigned: 0,
+		sort: settings.sort || 'name_asc',
 		canManage: !! settings.canManage,
 
 		set: function( summary ) {
 			this.folders = summary.folders || [];
 			this.total = parseInt( summary.total, 10 ) || 0;
 			this.unassigned = parseInt( summary.unassigned, 10 ) || 0;
+			if ( summary.sort ) {
+				this.sort = summary.sort;
+			}
 			this.trigger( 'change' );
 		},
 
@@ -48,8 +52,8 @@
 		},
 
 		/**
-		 * Folders in tree order (depth first, siblings by name, as sorted by
-		 * the server). Folders whose parent is missing are shown at the top level.
+		 * Folders in tree order (depth first, siblings in the user's sort mode,
+		 * as sorted by the server; never re-sorted here). Folders whose parent is missing are shown at the top level.
 		 *
 		 * @return {Object[]} { folder, depth, parents: [ids], hasChildren }.
 		 */
@@ -73,6 +77,33 @@
 			}( '0', 0, [] ) );
 
 			return list;
+		},
+
+		/**
+		 * Saves the folder sort mode of the current user.
+		 *
+		 * @param {string} mode Sort mode.
+		 * @return {Promise} Resolves with the summary.
+		 */
+		setSort: function( mode ) {
+			return wp.apiFetch( { path: '/fmm/v1/preferences', method: 'POST', data: { sort: mode } } ).then( function( summary ) {
+				store.set( summary );
+				return summary;
+			} );
+		},
+
+		/**
+		 * Stores the manual order of the folders below a parent.
+		 *
+		 * @param {string|number} parentId Parent folder ID, 0 for the top level.
+		 * @param {Array}         ids      Folder IDs in the new order.
+		 * @return {Promise} Resolves with the summary.
+		 */
+		reorder: function( parentId, ids ) {
+			return wp.apiFetch( { path: '/fmm/v1/folders/order', method: 'POST', data: { parent: Number( parentId ) || 0, ids: _.map( ids, Number ) } } ).then( function( summary ) {
+				store.set( summary );
+				return summary;
+			} );
 		},
 
 		refresh: function() {

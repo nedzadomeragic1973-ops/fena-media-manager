@@ -24,6 +24,7 @@
 	var store = fmm.store;
 	var PROP = fmm.prop;
 	var DRAG_TYPE = 'application/x-fmm-media';
+	var FOLDER_DRAG_TYPE = 'application/x-fmm-folder';
 
 	/*
 	 * Logical icon names, mapped to Dashicons for now. Replacing this map
@@ -41,6 +42,9 @@
 		collapsed: 'arrow-right-alt2',
 		expanded: 'arrow-down-alt2',
 		rename: 'edit',
+		more: 'ellipsis',
+		'move-up': 'arrow-up-alt2',
+		'move-down': 'arrow-down-alt2',
 		'delete': 'trash'
 	};
 
@@ -63,6 +67,9 @@
 		this.hasTree = false;
 		this.busy = false;
 		this.dragIds = null;
+		this.dragFolder = null; // Folder ID being dragged for reordering.
+		this.renderPending = false;
+		this.menuOpen = null; // Folder ID whose actions menu is open.
 
 		this.$el = $( '<nav class="fmm-sidebar"></nav>' ).attr( 'aria-label', __( 'Folders', 'fena-media-manager' ) );
 		this.$el.append(
@@ -71,6 +78,7 @@
 				store.canManage ? $( '<button type="button" class="button button-small fmm-sidebar__new" data-fmm-key="new"></button>' )
 					.append( icon( 'create' ), $( '<span></span>' ).text( __( 'New Folder', 'fena-media-manager' ) ) ) : null
 			),
+			this.sortControl(),
 			$( '<div class="fmm-sidebar__notice notice inline is-dismissible" hidden></div>' ).append(
 				'<p></p>',
 				$( '<button type="button" class="notice-dismiss"></button>' ).append(
@@ -87,6 +95,77 @@
 	}
 
 	_.extend( Sidebar.prototype, {
+
+		/**
+		 * Sort mode select; the server sorts, this only stores the choice.
+		 *
+		 * @return {jQuery} Sort control.
+		 */
+		sortControl: function() {
+			var $select = $( '<select id="fmm-folder-sort" class="fmm-sort__select"></select>' );
+
+			_.each( {
+				name_asc: __( 'Name (A–Z)', 'fena-media-manager' ),
+				name_desc: __( 'Name (Z–A)', 'fena-media-manager' ),
+				newest: __( 'Newest first', 'fena-media-manager' ),
+				oldest: __( 'Oldest first', 'fena-media-manager' ),
+				manual: __( 'Manual order', 'fena-media-manager' )
+			}, function( label, mode ) {
+				$select.append( $( '<option></option>' ).val( mode ).text( label ) );
+			} );
+
+			return $( '<div class="fmm-sort"></div>' ).append(
+				$( '<label class="screen-reader-text" for="fmm-folder-sort"></label>' ).text( __( 'Sort folders', 'fena-media-manager' ) ),
+				$select
+			);
+		},
+
+		/**
+		 * Tree node of a folder.
+		 *
+		 * @param {string} id Folder ID.
+		 * @return {Object|undefined} Node from store.tree().
+		 */
+		node: function( id ) {
+			return _.find( store.tree(), function( node ) {
+				return String( node.folder.id ) === String( id );
+			} );
+		},
+
+		/**
+		 * Effective parent ID of a tree node ('0' = top level).
+		 *
+		 * @param {Object} node Node from store.tree().
+		 * @return {string} Parent ID.
+		 */
+		parentOf: function( node ) {
+			return node.parents.length ? node.parents[ node.parents.length - 1 ] : '0';
+		},
+
+		/**
+		 * Sibling folder IDs of a folder (including itself) in server order.
+		 *
+		 * @param {string} id Folder ID.
+		 * @return {Object|null} { parent, ids } or null for unknown folders.
+		 */
+		siblings: function( id ) {
+			var self = this;
+			var tree = store.tree();
+			var node = this.node( id );
+
+			if ( ! node ) {
+				return null;
+			}
+
+			return {
+				parent: this.parentOf( node ),
+				ids: _.chain( tree ).filter( function( other ) {
+					return self.parentOf( other ) === self.parentOf( node );
+				} ).map( function( other ) {
+					return String( other.folder.id );
+				} ).value()
+			};
+		},
 
 		current: function() {
 			var value = this.library.props.get( PROP );
@@ -157,6 +236,87 @@
 
 			this.$el.on( 'click', '.fmm-folder-subfolder', function() {
 				self.startEdit( 'new', String( $( this ).closest( 'li' ).data( 'folder' ) ) );
+			} );
+
+			this.$el.on( 'change', '.fmm-sort__select', function() {
+				var $select = $( this );
+				var label = $select.find( 'option:selected' ).text();
+
+				store.setSort( $select.val() ).then( function() {
+					if ( wp.a11y ) {
+						/* translators: %s: sort order, e.g. "Name (A–Z)". */
+						wp.a11y.speak( sprintf( __( 'Folders sorted: %s.', 'fena-media-manager' ), label ), 'polite' );
+					}
+				} ).catch( function( error ) {
+					self.fail( error, __( 'The sort order could not be saved.', 'fena-media-manager' ) );
+					$select.val( store.sort );
+				} );
+			} );
+
+			this.$el.on( 'click', '.fmm-folder-menu-toggle', function() {
+				var id = String( $( this ).closest( 'li' ).data( 'folder' ) );
+				self.menuOpen = self.menuOpen === id ? null : id;
+				self.render();
+				self.focusKey( 'menu-' + id );
+			} );
+
+			this.$el.on( 'click', '.fmm-folder-up, .fmm-folder-down', function() {
+				self.move( String( $( this ).closest( 'li' ).data( 'folder' ) ), $( this ).hasClass( 'fmm-folder-up' ) ? -1 : 1 );
+			} );
+
+			this.$el.on( 'keydown', '.fmm-sidebar__item', function( event ) {
+				var id = String( $( this ).data( 'folder' ) );
+				var $items, index;
+
+				if ( self.menuOpen !== id || ! $( event.target ).closest( '.fmm-menu, .fmm-folder-menu-toggle' ).length ) {
+					return;
+				}
+
+				if ( 'Escape' === event.key ) {
+					event.preventDefault();
+					event.stopPropagation();
+					self.closeMenu( 'menu-' + id );
+					return;
+				}
+
+				$items = $( this ).find( '.fmm-menu__item' );
+				index = $items.index( event.target );
+				if ( ! $items.length || ( index < 0 && 'ArrowDown' !== event.key ) ) {
+					return;
+				}
+				if ( 'ArrowDown' === event.key ) {
+					index = index < 0 ? 0 : ( index + 1 ) % $items.length;
+				} else if ( 'ArrowUp' === event.key ) {
+					index = ( index + $items.length - 1 ) % $items.length;
+				} else if ( 'Home' === event.key ) {
+					index = 0;
+				} else if ( 'End' === event.key ) {
+					index = $items.length - 1;
+				} else {
+					return;
+				}
+				event.preventDefault();
+				$items.eq( index ).trigger( 'focus' );
+			} );
+
+			this.$el.on( 'focusout', '.fmm-sidebar__item', function() {
+				var id = String( $( this ).data( 'folder' ) );
+
+				setTimeout( function() {
+					var active = document.activeElement;
+					var $row = self.$el.find( '.fmm-sidebar__item[data-folder="' + id + '"]' );
+
+					// Focus on <body> is a click on empty space, handled by the click listener.
+					if ( self.menuOpen === id && active && active !== document.body && $row.length && ! $.contains( $row[ 0 ], active ) ) {
+						self.closeMenu();
+					}
+				}, 0 );
+			} );
+
+			$( document ).on( 'click', function( event ) {
+				if ( self.menuOpen && ! $( event.target ).closest( '.fmm-menu, .fmm-folder-menu-toggle' ).length ) {
+					self.closeMenu();
+				}
 			} );
 
 			this.$el.on( 'click', '.fmm-folder-rename', function() {
@@ -234,6 +394,10 @@
 			 */
 			function over( event ) {
 				var row;
+				if ( self.dragFolder ) {
+					self.folderOver( event );
+					return;
+				}
 				if ( ! self.dragIds ) {
 					return;
 				}
@@ -249,6 +413,10 @@
 			function drop( event ) {
 				var row;
 				var ids = self.dragIds;
+				if ( self.dragFolder ) {
+					self.folderDrop( event );
+					return;
+				}
 				if ( ! ids ) {
 					return;
 				}
@@ -260,6 +428,20 @@
 					self.assign( ids, row.data( 'folder' ), self.dropMode( event, row.data( 'folder' ) ) );
 				}
 			}
+
+			this.$el.on( 'dragstart', '.fmm-folder[draggable="true"]', function( event ) {
+				var dt = event.originalEvent && event.originalEvent.dataTransfer;
+				var id = String( $( this ).closest( 'li' ).data( 'folder' ) );
+
+				if ( ! dt ) {
+					return;
+				}
+
+				self.dragFolder = id;
+				dt.effectAllowed = 'move';
+				dt.setData( FOLDER_DRAG_TYPE, id );
+				self.$el.addClass( 'is-dragging-folder' );
+			} );
 
 			document.addEventListener( 'dragenter', over, true );
 			document.addEventListener( 'dragover', over, true );
@@ -291,8 +473,155 @@
 
 		endDrag: function() {
 			this.dragIds = null;
+			this.dragFolder = null;
 			this.highlight( null );
-			this.$el.removeClass( 'is-dragging' );
+			this.clearFolderDrop();
+			this.$el.removeClass( 'is-dragging is-dragging-folder' );
+			if ( this.renderPending ) {
+				this.render();
+			}
+		},
+
+		clearFolderDrop: function() {
+			this.$el.find( '.is-drop-before, .is-drop-after' ).removeClass( 'is-drop-before is-drop-after' );
+		},
+
+		/**
+		 * Where a dragged folder would be dropped: next to a sibling row.
+		 *
+		 * @param {Event} event Drag event.
+		 * @return {Object|null} { $row, id, position: 'before'|'after' } or null.
+		 */
+		folderDropTarget: function( event ) {
+			var $row = $( event.target ).closest( '.fmm-sidebar__item--folder' );
+			var dragged = this.node( this.dragFolder );
+			var target, rect;
+
+			if ( ! $row.length || ! $.contains( this.$el[ 0 ], $row[ 0 ] ) || ! dragged ) {
+				return null;
+			}
+
+			target = this.node( $row.data( 'folder' ) );
+			if ( ! target || target === dragged || this.parentOf( target ) !== this.parentOf( dragged ) ) {
+				return null;
+			}
+
+			rect = $row[ 0 ].getBoundingClientRect();
+
+			return { $row: $row, id: String( target.folder.id ), position: event.clientY < rect.top + rect.height / 2 ? 'before' : 'after' };
+		},
+
+		folderOver: function( event ) {
+			var target = this.folderDropTarget( event );
+
+			event.stopPropagation();
+			this.clearFolderDrop();
+			if ( target ) {
+				event.preventDefault();
+				event.dataTransfer.dropEffect = 'move';
+				target.$row.addClass( 'before' === target.position ? 'is-drop-before' : 'is-drop-after' );
+			}
+		},
+
+		folderDrop: function( event ) {
+			var target = this.folderDropTarget( event );
+			var dragged = this.dragFolder;
+			var info = this.siblings( dragged );
+			var ids;
+
+			event.stopPropagation();
+			event.preventDefault();
+			this.endDrag();
+
+			if ( ! target || ! info ) {
+				return;
+			}
+
+			ids = _.without( info.ids, dragged );
+			ids.splice( _.indexOf( ids, target.id ) + ( 'after' === target.position ? 1 : 0 ), 0, dragged );
+			if ( ! _.isEqual( ids, info.ids ) ) {
+				this.saveOrder( dragged, info.parent, ids );
+			}
+		},
+
+		/**
+		 * Moves a folder one position among its siblings.
+		 *
+		 * @param {string} id    Folder ID.
+		 * @param {number} delta -1 (up) or 1 (down).
+		 */
+		move: function( id, delta ) {
+			var info = this.siblings( id );
+			var index = info ? _.indexOf( info.ids, id ) : -1;
+			var ids;
+
+			if ( index < 0 || index + delta < 0 || index + delta >= info.ids.length ) {
+				return;
+			}
+
+			ids = info.ids.slice();
+			ids[ index ] = ids[ index + delta ];
+			ids[ index + delta ] = id;
+
+			this.saveOrder( id, info.parent, ids, delta < 0 ? 'up' : 'down' );
+		},
+
+		/**
+		 * Saves the manual order of one sibling group.
+		 *
+		 * @param {string}   id       Moved folder ID.
+		 * @param {string}   parent   Parent folder ID ('0' = top level).
+		 * @param {string[]} ids      Sibling IDs in the new order.
+		 * @param {string}   [action] 'up' or 'down' when started from the menu: refocuses that item.
+		 */
+		saveOrder: function( id, parent, ids, action ) {
+			var self = this;
+			var folder = store.get( id );
+
+			if ( this.busy || ! folder ) {
+				return;
+			}
+
+			this.busy = true;
+			store.reorder( parent, ids ).then( function() {
+				var $focus;
+
+				self.busy = false;
+				/* translators: 1: folder name, 2: new position, 3: number of folders on this level. */
+				wp.a11y.speak( sprintf( __( 'Folder “%1$s” moved to position %2$d of %3$d.', 'fena-media-manager' ), folder.name, _.indexOf( ids, id ) + 1, ids.length ), 'polite' );
+
+				if ( action && self.menuOpen === id ) {
+					$focus = _.find( _.map( [ action + '-' + id, ( 'up' === action ? 'down-' : 'up-' ) + id, 'menu-' + id ], function( key ) {
+						return self.$el.find( '[data-fmm-key="' + key + '"]' );
+					} ), function( $candidate ) {
+						return $candidate.length;
+					} );
+					if ( $focus ) {
+						$focus.trigger( 'focus' );
+					}
+				}
+			} ).catch( function( error ) {
+				if ( error && 'fmm_order_conflict' === error.code ) {
+					self.busy = false;
+					self.notice( error.message, 'warning' );
+					store.refresh().catch( function() {} );
+					return;
+				}
+				self.fail( error, __( 'The folder order could not be saved.', 'fena-media-manager' ) );
+			} );
+		},
+
+		/**
+		 * Closes the actions menu.
+		 *
+		 * @param {string} [focus] data-fmm-key to focus afterwards.
+		 */
+		closeMenu: function( focus ) {
+			this.menuOpen = null;
+			this.render();
+			if ( focus ) {
+				this.focusKey( focus );
+			}
 		},
 
 		/**
@@ -310,7 +639,7 @@
 			var selected = this.selectedIds().length;
 			var source = this.currentFolder();
 			var $li = $( '<li class="fmm-sidebar__item"></li>' ).attr( 'data-folder', value );
-			var inFolder, $actions;
+			var inFolder, $actions, $folder;
 
 			if ( node && node.depth ) {
 				$li[ 0 ].style.setProperty( '--fmm-depth', node.depth );
@@ -325,15 +654,17 @@
 				$li.append( node && node.hasChildren ? this.toggleButton( node.folder ) : '<span class="fmm-folder-toggle fmm-folder-toggle--empty" aria-hidden="true"></span>' );
 			}
 
-			$li.append(
-				$( '<button type="button" class="fmm-folder"></button>' ).attr( 'data-fmm-key', 'folder-' + value ).append(
+			$folder = $( '<button type="button" class="fmm-folder"></button>' ).attr( 'data-fmm-key', 'folder-' + value ).append(
 					icon( iconName ),
 					$( '<span class="fmm-folder__name"></span>' ).text( name ),
 					$( '<span class="fmm-folder__count"></span>' ).text( count )
 						/* translators: %d: number of media items. */
 						.attr( 'aria-label', sprintf( _n( '%d item', '%d items', count, 'fena-media-manager' ), count ) )
-				)
 			);
+			if ( isFolder && 'manual' === store.sort && store.canManage && ! selected && null === this.editing ) {
+				$folder.attr( 'draggable', 'true' );
+			}
+			$li.append( $folder );
 
 			if ( ! isFolder ) {
 				return $li;
@@ -369,15 +700,60 @@
 					$( '<span class="fmm-folder__actions"></span>' ).append(
 						/* translators: %s: folder name. */
 						this.actionButton( 'fmm-folder-subfolder', 'subfolder', 'subfolder-' + value, sprintf( __( 'New subfolder in “%s”', 'fena-media-manager' ), name ) ),
-						/* translators: %s: folder name. */
-						this.actionButton( 'fmm-folder-rename', 'rename', 'rename-' + value, sprintf( __( 'Rename folder “%s”', 'fena-media-manager' ), name ) ),
-						/* translators: %s: folder name. */
-						this.actionButton( 'fmm-folder-delete', 'delete', 'delete-' + value, sprintf( __( 'Delete folder “%s”', 'fena-media-manager' ), name ) )
+						this.menuToggle( value, name )
 					)
 				);
+				if ( this.menuOpen === value ) {
+					$li.addClass( 'is-menu-open' ).append( this.menu( value ) );
+				}
 			}
 
 			return $li;
+		},
+
+		/**
+		 * "More actions" button of a folder row.
+		 *
+		 * @param {string} id   Folder ID.
+		 * @param {string} name Folder name.
+		 * @return {jQuery} Button.
+		 */
+		menuToggle: function( id, name ) {
+			var open = this.menuOpen === id;
+			/* translators: %s: folder name. */
+			var label = sprintf( __( 'More actions for “%s”', 'fena-media-manager' ), name );
+
+			return this.actionButton( 'fmm-folder-menu-toggle', 'more', 'menu-' + id, label )
+				.attr( { 'aria-expanded': String( open ), 'aria-controls': open ? 'fmm-folder-menu-' + id : null } );
+		},
+
+		/**
+		 * Actions menu of a folder (inline disclosure). Add entries to the
+		 * list to extend it.
+		 *
+		 * @param {string} id Folder ID.
+		 * @return {jQuery} Menu.
+		 */
+		menu: function( id ) {
+			var info = this.siblings( id );
+			var index = info ? _.indexOf( info.ids, id ) : -1;
+			var manual = 'manual' === store.sort;
+			var items = [ { className: 'fmm-folder-rename', icon: 'rename', key: 'rename-' + id, label: __( 'Rename', 'fena-media-manager' ) } ];
+
+			if ( manual && index > 0 ) {
+				items.push( { className: 'fmm-folder-up', icon: 'move-up', key: 'up-' + id, label: __( 'Move up', 'fena-media-manager' ) } );
+			}
+			if ( manual && index >= 0 && index < info.ids.length - 1 ) {
+				items.push( { className: 'fmm-folder-down', icon: 'move-down', key: 'down-' + id, label: __( 'Move down', 'fena-media-manager' ) } );
+			}
+			items.push( { className: 'fmm-folder-delete', icon: 'delete', key: 'delete-' + id, label: __( 'Delete', 'fena-media-manager' ) } );
+
+			return $( '<div class="fmm-menu"></div>' ).attr( 'id', 'fmm-folder-menu-' + id ).append( _.map( items, function( item ) {
+				return $( '<button type="button" class="fmm-menu__item"></button>' )
+					.addClass( item.className )
+					.attr( 'data-fmm-key', item.key )
+					.append( icon( item.icon ), $( '<span></span>' ).text( item.label ) );
+			} ) );
 		},
 
 		/**
@@ -426,10 +802,21 @@
 
 		render: function() {
 			var self = this;
+
+			// Drags keep the DOM they started on; endDrag() renders afterwards.
+			if ( this.dragIds || this.dragFolder ) {
+				this.renderPending = true;
+				return;
+			}
+			this.renderPending = false;
 			var $list = this.$el.find( '.fmm-sidebar__list' );
 			var focusKey = $( document.activeElement ).closest( this.$el ).length ? $( document.activeElement ).attr( 'data-fmm-key' ) : null;
 			var selected = this.selectedIds().length;
 			var tree = store.tree();
+
+			if ( this.menuOpen && ( selected || null !== this.editing || ! store.get( this.menuOpen ) ) ) {
+				this.menuOpen = null;
+			}
 
 			this.hasTree = _.some( tree, function( node ) {
 				return node.hasChildren;
@@ -464,6 +851,7 @@
 				}
 			} );
 
+			this.$el.find( '.fmm-sort__select' ).val( store.sort );
 			this.$el.toggleClass( 'has-selection', selected > 0 );
 			this.$el.find( '.fmm-sidebar__selection' ).prop( 'hidden', ! selected ).text( ! selected ? '' : ( this.currentFolder() ?
 				/* translators: %d: number of selected media files. */
@@ -517,6 +905,7 @@
 		 */
 		startEdit: function( id, parent ) {
 			this.editing = id;
+			this.menuOpen = null;
 			this.newParent = 'new' === id && parent ? String( parent ) : '';
 			if ( this.newParent ) {
 				this.expanded[ this.newParent ] = true;
@@ -620,6 +1009,7 @@
 				return;
 			}
 
+			this.menuOpen = null;
 			this.busy = true;
 			wp.apiFetch( { path: '/fmm/v1/folders/' + id, method: 'DELETE' } ).then( function() {
 				self.busy = false;
