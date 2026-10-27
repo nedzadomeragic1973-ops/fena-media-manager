@@ -13,6 +13,11 @@
 	--fmm-active-bg: #f3f4f4;
 	--fmm-border: #e5e5e5;
 	--fmm-muted: #6b6b6b;
+	--fmm-color-gray: #787c82;
+	--fmm-color-blue: #4a72b0;
+	--fmm-color-violet: #7b61c9;
+	--fmm-color-sand: #a07e45;
+	--fmm-color-green: #5b8a66;
 }
 
 /* Plugin buttons (core button classes, scoped by plugin class) */
@@ -226,6 +231,27 @@
 
 .fmm-sidebar__item.is-active .fmm-folder .dashicons {
 	color: inherit;
+}
+
+/* Folder colors: only the icon of real folders, in every row state */
+.fmm-folder[data-fmm-color="blue"] {
+	--fmm-folder-color: var(--fmm-color-blue);
+}
+
+.fmm-folder[data-fmm-color="violet"] {
+	--fmm-folder-color: var(--fmm-color-violet);
+}
+
+.fmm-folder[data-fmm-color="sand"] {
+	--fmm-folder-color: var(--fmm-color-sand);
+}
+
+.fmm-folder[data-fmm-color="green"] {
+	--fmm-folder-color: var(--fmm-color-green);
+}
+
+.fmm-sidebar .fmm-sidebar__item.fmm-sidebar__item--folder .fmm-folder .dashicons {
+	color: var(--fmm-folder-color, var(--fmm-color-gray));
 }
 
 .fmm-folder__name {
@@ -524,6 +550,83 @@
 .fmm-dialog .fmm-dialog__field input:focus {
 	border-color: var(--fmm-accent);
 	box-shadow: 0 0 0 1px var(--fmm-accent);
+}
+
+/* Color dialog */
+.fmm-dialog .fmm-dialog__colors {
+	margin: 0;
+	padding: 0;
+	border: 0;
+}
+
+.fmm-dialog .fmm-dialog__colors legend {
+	margin: 0 0 6px;
+	padding: 0;
+	font-weight: 600;
+}
+
+.fmm-dialog .fmm-dialog__color {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 0 0 6px;
+}
+
+.fmm-dialog .fmm-dialog__color-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 0 0 6px;
+}
+
+.fmm-dialog .fmm-dialog__color-row .fmm-dialog__color {
+	margin: 0;
+}
+
+.fmm-dialog .fmm-dialog__color input[type="radio"] {
+	margin: 0;
+}
+
+.fmm-dialog .fmm-dialog__color input[type="color"] {
+	width: 32px;
+	height: 24px;
+	margin: 0;
+	padding: 0;
+	border: 1px solid var(--fmm-border);
+	cursor: pointer;
+}
+
+.fmm-dialog .fmm-dialog__color input[type="color"]:focus,
+.fmm-dialog .fmm-dialog__color input[type="radio"]:focus {
+	outline: 2px solid var(--fmm-accent);
+	outline-offset: 1px;
+	box-shadow: none;
+}
+
+.fmm-dialog .fmm-swatch {
+	flex: none;
+	box-sizing: border-box;
+	width: 14px;
+	height: 14px;
+	background: var(--fmm-folder-color, var(--fmm-color-gray));
+	border: 1px solid rgba(0, 0, 0, 0.2);
+	border-radius: 50%;
+}
+
+.fmm-dialog .fmm-swatch[data-fmm-color="blue"] {
+	--fmm-folder-color: var(--fmm-color-blue);
+}
+
+.fmm-dialog .fmm-swatch[data-fmm-color="violet"] {
+	--fmm-folder-color: var(--fmm-color-violet);
+}
+
+.fmm-dialog .fmm-swatch[data-fmm-color="sand"] {
+	--fmm-folder-color: var(--fmm-color-sand);
+}
+
+.fmm-dialog .fmm-swatch[data-fmm-color="green"] {
+	--fmm-folder-color: var(--fmm-color-green);
 }
 
 /* Inline create/rename form */

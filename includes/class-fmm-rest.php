@@ -79,6 +79,7 @@ class FMM_REST {
 							'type'    => 'integer',
 							'minimum' => 0,
 						),
+						'color'  => array( 'type' => 'string' ),
 					),
 				),
 				array(
@@ -257,8 +258,8 @@ class FMM_REST {
 	}
 
 	/**
-	 * PATCH /folders/<id>. Renames and/or moves a folder; the slug stays
-	 * stable; media assignments are untouched because the term_taxonomy_id
+	 * PATCH /folders/<id>. Renames, moves and/or recolors a folder (`color`:
+	 * preset key, #rrggbb, or ''/'gray' to reset); the slug stays stable; media assignments are untouched because the term_taxonomy_id
 	 * does not change. A moved folder goes to the end of its new level and
 	 * takes its subfolders along.
 	 *
@@ -271,7 +272,7 @@ class FMM_REST {
 			return self::not_found();
 		}
 
-		if ( ! $request->has_param( 'name' ) && ! $request->has_param( 'parent' ) ) {
+		if ( ! $request->has_param( 'name' ) && ! $request->has_param( 'parent' ) && ! $request->has_param( 'color' ) ) {
 			return new WP_Error( 'fmm_nothing_to_update', __( 'Nothing to update.', 'fena-media-manager' ), array( 'status' => 400 ) );
 		}
 
@@ -309,6 +310,16 @@ class FMM_REST {
 			return self::term_error( new WP_Error( 'term_exists' ) );
 		}
 
+		$color = null;
+		if ( $request->has_param( 'color' ) ) {
+			$raw   = $request['color'];
+			$reset = in_array( $raw, array( '', 'gray' ), true );
+			$color = $reset ? '' : FMM_Taxonomy::sanitize_color( $raw );
+			if ( ! $reset && '' === $color ) {
+				return new WP_Error( 'fmm_invalid_color', __( 'Invalid folder color.', 'fena-media-manager' ), array( 'status' => 400 ) );
+			}
+		}
+
 		$order = $moved ? FMM_Taxonomy::next_order( $parent ) : 0;
 		if ( $args ) {
 			$result = wp_update_term( $folder->term_id, FMM_Taxonomy::NAME, $args );
@@ -318,6 +329,11 @@ class FMM_REST {
 		}
 		if ( $moved ) {
 			update_term_meta( $folder->term_id, FMM_Taxonomy::ORDER_META, $order );
+		}
+		if ( '' === $color ) {
+			delete_term_meta( $folder->term_id, FMM_Taxonomy::COLOR_META );
+		} elseif ( null !== $color ) {
+			update_term_meta( $folder->term_id, FMM_Taxonomy::COLOR_META, $color );
 		}
 
 		return rest_ensure_response( FMM_Taxonomy::prepare_folder( FMM_Taxonomy::get_folder( $folder->term_id ) ) );

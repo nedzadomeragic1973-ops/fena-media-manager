@@ -25,6 +25,9 @@
 	var PROP = fmm.prop;
 	var DRAG_TYPE = 'application/x-fmm-media';
 	var FOLDER_DRAG_TYPE = 'application/x-fmm-folder';
+	var COLOR_PRESETS = [ 'blue', 'violet', 'sand', 'green' ];
+	var COLOR_HEX = /^#[0-9a-f]{6}$/i;
+	var DEFAULT_CUSTOM_COLOR = '#7b61c9';
 
 	/*
 	 * Logical icon names, mapped to Dashicons for now. Replacing this map
@@ -44,6 +47,7 @@
 		rename: 'edit',
 		more: 'ellipsis',
 		'move-to': 'move',
+		color: 'art',
 		'move-up': 'arrow-up-alt2',
 		'move-down': 'arrow-down-alt2',
 		'delete': 'trash'
@@ -266,6 +270,13 @@
 				self.menuOpen = null;
 				self.render();
 				self.openMoveDialog( id );
+			} );
+
+			this.$el.on( 'click', '.fmm-folder-color', function() {
+				var id = String( $( this ).closest( 'li' ).data( 'folder' ) );
+				self.menuOpen = null;
+				self.render();
+				self.openColorDialog( id );
 			} );
 
 			this.$el.on( 'click', '.fmm-folder-up, .fmm-folder-down', function() {
@@ -702,6 +713,94 @@
 		},
 
 		/**
+		 * "Color…" dialog of a folder: preset radios plus a custom color.
+		 *
+		 * @param {string} id Folder ID.
+		 */
+		openColorDialog: function( id ) {
+			var self = this;
+			var folder = store.get( id );
+			var current = folder ? folder.color || '' : '';
+			var custom = COLOR_HEX.test( current );
+			var $picker = $( '<input type="color" id="fmm-color-custom" />' ).val( custom ? current : DEFAULT_CUSTOM_COLOR );
+			var $fieldset = $( '<fieldset class="fmm-dialog__colors"></fieldset>' ).append( $( '<legend></legend>' ).text( __( 'Color', 'fena-media-manager' ) ) );
+			var options = [
+				{ value: 'gray', label: __( 'Gray (Default)', 'fena-media-manager' ) },
+				{ value: 'blue', label: __( 'Blue', 'fena-media-manager' ) },
+				{ value: 'violet', label: __( 'Violet', 'fena-media-manager' ) },
+				{ value: 'sand', label: __( 'Sand', 'fena-media-manager' ) },
+				{ value: 'green', label: __( 'Green', 'fena-media-manager' ) },
+				{ value: 'custom', label: __( 'Custom', 'fena-media-manager' ) }
+			];
+			var selected = custom ? 'custom' : ( current || 'gray' );
+
+			if ( ! folder ) {
+				return;
+			}
+
+			_.each( options, function( option ) {
+				var $swatch = $( '<span class="fmm-swatch" aria-hidden="true"></span>' ).attr( 'data-fmm-color', 'custom' === option.value ? null : option.value );
+				var $label = $( '<label class="fmm-dialog__color"></label>' ).append(
+					$( '<input type="radio" name="fmm-color" />' ).val( option.value ).prop( 'checked', option.value === selected ),
+					$swatch,
+					$( '<span></span>' ).text( option.label )
+				);
+
+				if ( 'custom' === option.value ) {
+					$swatch[ 0 ].style.setProperty( '--fmm-folder-color', $picker.val() );
+					$fieldset.append( $( '<div class="fmm-dialog__color-row"></div>' ).append(
+						$label,
+						$( '<label class="screen-reader-text" for="fmm-color-custom"></label>' ).text( __( 'Custom color', 'fena-media-manager' ) ),
+						$picker.on( 'input change', function() {
+							$fieldset.find( 'input[value="custom"]' ).prop( 'checked', true );
+							$swatch[ 0 ].style.setProperty( '--fmm-folder-color', $picker.val() );
+						} )
+					) );
+					return;
+				}
+				$fieldset.append( $label );
+			} );
+
+			this.dialog( {
+				/* translators: %s: folder name. */
+				title: sprintf( __( 'Color of folder “%s”', 'fena-media-manager' ), folder.name ),
+				submit: __( 'Save', 'fena-media-manager' ),
+				focus: 'folder-' + id,
+				body: $fieldset,
+				onSubmit: function( api ) {
+					var choice = $fieldset.find( 'input[name="fmm-color"]:checked' ).val();
+					var value = 'custom' === choice ? String( $picker.val() ).toLowerCase() : choice;
+
+					if ( value === ( current || 'gray' ) ) {
+						api.close();
+						return;
+					}
+					if ( self.busy ) {
+						return;
+					}
+
+					self.busy = true;
+					api.error( '' );
+					api.busy( true );
+					wp.apiFetch( { path: '/fmm/v1/folders/' + id, method: 'PATCH', data: { color: value } } ).then( function() {
+						self.busy = false;
+						/* translators: %s: folder name. */
+						self.notice( sprintf( __( 'Color of folder “%s” changed.', 'fena-media-manager' ), folder.name ), 'success' );
+						api.close();
+						return store.refresh().then( function() {
+							self.focusKey( 'folder-' + id );
+						} );
+					}, function( error ) {
+						self.busy = false;
+						api.busy( false );
+						api.error( ( error && error.message ) || __( 'The color could not be saved.', 'fena-media-manager' ) );
+					} );
+				}
+			} );
+			$fieldset.find( 'input[name="fmm-color"]:checked' ).trigger( 'focus' );
+		},
+
+		/**
 		 * "Move to…" dialog of a folder.
 		 *
 		 * @param {string} id Folder ID.
@@ -899,6 +998,11 @@
 			if ( isFolder && store.canManage && ! selected && null === this.editing ) {
 				$folder.attr( 'draggable', 'true' );
 			}
+			if ( node && _.contains( COLOR_PRESETS, node.folder.color ) ) {
+				$folder.attr( 'data-fmm-color', node.folder.color );
+			} else if ( node && COLOR_HEX.test( node.folder.color || '' ) ) {
+				$folder[ 0 ].style.setProperty( '--fmm-folder-color', node.folder.color );
+			}
 			$li.append( $folder );
 
 			if ( ! isFolder ) {
@@ -977,6 +1081,7 @@
 
 			if ( window.HTMLDialogElement && HTMLDialogElement.prototype.showModal ) {
 				items.push( { className: 'fmm-folder-moveto', icon: 'move-to', key: 'moveto-' + id, label: __( 'Move to…', 'fena-media-manager' ) } );
+				items.push( { className: 'fmm-folder-color', icon: 'color', key: 'color-' + id, label: __( 'Color…', 'fena-media-manager' ) } );
 			}
 
 			if ( manual && index > 0 ) {

@@ -33,6 +33,16 @@ class FMM_Taxonomy {
 	const SORT_META = 'fmm_folder_sort';
 
 	/**
+	 * Term meta key of the folder color. Gray (default) stores nothing.
+	 */
+	const COLOR_META = 'fmm_color';
+
+	/**
+	 * Preset folder colors.
+	 */
+	const COLOR_PRESETS = array( 'blue', 'violet', 'sand', 'green' );
+
+	/**
 	 * Available folder sort modes.
 	 */
 	const SORT_MODES = array( 'name_asc', 'name_desc', 'newest', 'oldest', 'manual' );
@@ -87,6 +97,33 @@ class FMM_Taxonomy {
 				'show_in_rest'      => false,
 			)
 		);
+
+		register_term_meta(
+			self::NAME,
+			self::COLOR_META,
+			array(
+				'type'              => 'string',
+				'single'            => true,
+				'sanitize_callback' => array( __CLASS__, 'sanitize_color' ),
+				'show_in_rest'      => false,
+			)
+		);
+	}
+
+	/**
+	 * Sanitizes a folder color: a preset key or a lowercase #rrggbb value.
+	 *
+	 * @param mixed $raw Raw color.
+	 * @return string Preset key, hex color, or '' (gray / invalid).
+	 */
+	public static function sanitize_color( $raw ) {
+		$raw = is_string( $raw ) ? $raw : '';
+
+		if ( in_array( $raw, self::COLOR_PRESETS, true ) ) {
+			return $raw;
+		}
+
+		return preg_match( '/^#[0-9a-f]{6}$/i', $raw ) ? strtolower( $raw ) : '';
 	}
 
 	/**
@@ -356,6 +393,7 @@ class FMM_Taxonomy {
 			'parent' => (int) $term->parent,
 			'count'  => (int) $term->count,
 			'order'  => (int) get_term_meta( $term->term_id, self::ORDER_META, true ),
+			'color'  => self::sanitize_color( get_term_meta( $term->term_id, self::COLOR_META, true ) ),
 		);
 	}
 
