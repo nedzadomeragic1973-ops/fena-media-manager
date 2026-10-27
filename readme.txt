@@ -18,6 +18,8 @@ data are never changed; one file can be in several folders.
 * Folder sidebar in Media > Library (grid view) with "All Media", "Unassigned"
   and media counts per folder.
 * Subfolders in any depth, shown as a collapsible tree (collapsed on load).
+* Instant folder search in the sidebar: case- and accent-insensitive, finds nested
+  subfolders and temporarily expands their parents; the active folder does not change.
 * Folder colors (gray default, blue, violet, sand, green or a custom color): only the
   folder icon is colored; the color is stored per folder.
 * Move folders within the hierarchy (top level or any other folder) with "Move to…" or
@@ -87,6 +89,7 @@ Return a capability that only trusted roles have, never `read` or
 * Move media between folders (drag and drop, → button) while keeping other folder assignments.
 * Uploads are assigned to the active folder.
 * Subfolders with a collapsible tree in the sidebar and indented folder lists.
+* Instant folder search in the sidebar (accent/case-insensitive, finds nested subfolders, does not change the active folder).
 * Folder colors (gray default, blue, violet, sand, green, custom); only the folder icon is colored, stored per folder.
 * Folders can be moved to another parent or the top level ("Move to…", drag and drop); media assignments stay unchanged.
 * Folder sorting (A–Z, Z–A, newest, oldest, manual order) with a per-user sort mode.

@@ -110,6 +110,44 @@
 	font-size: 16px;
 }
 
+/* Folder search */
+.fmm-search {
+	padding: 8px 12px 0;
+}
+
+.fmm-search .fmm-search__input {
+	width: 100%;
+	max-width: none;
+	min-height: 28px;
+	margin: 0;
+	font-size: 13px;
+	line-height: 1.5;
+}
+
+.fmm-search .fmm-search__input:focus {
+	border-color: var(--fmm-accent);
+	box-shadow: 0 0 0 1px var(--fmm-accent);
+}
+
+.fmm-sidebar .fmm-search__mark {
+	padding: 0;
+	color: inherit;
+	background: rgba(123, 97, 201, 0.18);
+	border-radius: 2px;
+}
+
+.fmm-sidebar .fmm-sidebar__empty {
+	padding: 8px 12px;
+	color: var(--fmm-muted);
+	font-size: 12px;
+}
+
+.fmm-sidebar .fmm-folder-toggle:disabled,
+.fmm-sidebar .fmm-folder-toggle:disabled:hover {
+	color: var(--fmm-muted);
+	cursor: default;
+}
+
 /* Sort mode */
 .fmm-sort {
 	padding: 8px 12px 0;

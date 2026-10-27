@@ -58,6 +58,32 @@
 	}
 
 	/**
+	 * Lowercases a string and removes accents, remembering for every result
+	 * character the index of the original character it came from.
+	 *
+	 * @param {string} value Text.
+	 * @return {Object} { text, map } with map[ i ] = original index of text[ i ].
+	 */
+	function fold( value ) {
+		var text = '';
+		var map = [];
+		var i, j, part;
+
+		for ( i = 0; i < value.length; i++ ) {
+			part = value.charAt( i ).toLocaleLowerCase();
+			if ( part.normalize ) {
+				part = part.normalize( 'NFD' ).replace( /[\u0300-\u036f]/g, '' );
+			}
+			for ( j = 0; j < part.length; j++ ) {
+				map.push( i );
+			}
+			text += part;
+		}
+
+		return { text: text, map: map };
+	}
+
+	/**
 	 * Sidebar controller.
 	 *
 	 * @param {Object} frame Media grid frame.
@@ -75,6 +101,9 @@
 		this.dragFolder = null; // Folder ID being dragged for reordering.
 		this.renderPending = false;
 		this.menuOpen = null; // Folder ID whose actions menu is open.
+		this.query = ''; // Normalized folder search query; never persisted.
+		this.matchCount = 0;
+		this.announceTimer = null;
 
 		this.$el = $( '<nav class="fmm-sidebar"></nav>' ).attr( 'aria-label', __( 'Folders', 'fena-media-manager' ) );
 		this.$el.append(
@@ -83,6 +112,7 @@
 				store.canManage ? $( '<button type="button" class="button button-small fmm-sidebar__new" data-fmm-key="new"></button>' )
 					.append( icon( 'create' ), $( '<span></span>' ).text( __( 'New Folder', 'fena-media-manager' ) ) ) : null
 			),
+			this.searchControl(),
 			this.sortControl(),
 			$( '<div class="fmm-sidebar__notice notice inline is-dismissible" hidden></div>' ).append(
 				'<p></p>',
@@ -100,6 +130,95 @@
 	}
 
 	_.extend( Sidebar.prototype, {
+
+		/**
+		 * Folder search field (client-side filtering of the tree).
+		 *
+		 * @return {jQuery} Search control.
+		 */
+		searchControl: function() {
+			return $( '<div class="fmm-search" role="search"></div>' ).append(
+				$( '<label class="screen-reader-text" for="fmm-folder-search"></label>' ).text( __( 'Search folders', 'fena-media-manager' ) ),
+				$( '<input type="search" id="fmm-folder-search" class="fmm-search__input" autocomplete="off" spellcheck="false" />' ).attr( 'placeholder', __( 'Search folders…', 'fena-media-manager' ) )
+			);
+		},
+
+		/**
+		 * Applies the search field value and re-renders at once.
+		 *
+		 * @param {string}  raw     Field value.
+		 * @param {boolean} cleared Whether the search was cleared with Escape.
+		 */
+		setQuery: function( raw, cleared ) {
+			this.query = fold( $.trim( raw ) ).text;
+			this.render();
+			this.announceSearch( cleared );
+		},
+
+		/**
+		 * Announces the number of matches (debounced).
+		 *
+		 * @param {boolean} cleared Whether the search was cleared with Escape.
+		 */
+		announceSearch: function( cleared ) {
+			var self = this;
+
+			clearTimeout( this.announceTimer );
+			this.announceTimer = setTimeout( function() {
+				if ( ! wp.a11y ) {
+					return;
+				}
+				if ( self.query ) {
+					wp.a11y.speak( self.matchCount ?
+						/* translators: %d: number of folders. */
+						sprintf( _n( '%d folder found.', '%d folders found.', self.matchCount, 'fena-media-manager' ), self.matchCount ) :
+						__( 'No folders found.', 'fena-media-manager' ), 'polite' );
+				} else if ( cleared ) {
+					wp.a11y.speak( __( 'Search cleared.', 'fena-media-manager' ), 'polite' );
+				}
+			}, 400 );
+		},
+
+		/**
+		 * Position of the search query in a folder name.
+		 *
+		 * @param {string} name Folder name.
+		 * @return {Object|null} { start, end } in the original name, or null.
+		 */
+		findMatch: function( name ) {
+			var folded, index;
+
+			if ( ! this.query ) {
+				return null;
+			}
+
+			folded = fold( name );
+			index = folded.text.indexOf( this.query );
+
+			return index < 0 ? null : { start: folded.map[ index ], end: folded.map[ index + this.query.length - 1 ] + 1 };
+		},
+
+		/**
+		 * Folder name element; the search match is wrapped in <mark> (text nodes only).
+		 *
+		 * @param {string}  name      Folder name.
+		 * @param {boolean} highlight Whether to mark the search match.
+		 * @return {jQuery} Name element.
+		 */
+		nameElement: function( name, highlight ) {
+			var $name = $( '<span class="fmm-folder__name"></span>' );
+			var match = highlight ? this.findMatch( name ) : null;
+
+			if ( ! match ) {
+				return $name.text( name );
+			}
+
+			return $name.append(
+				document.createTextNode( name.slice( 0, match.start ) ),
+				$( '<mark class="fmm-search__mark"></mark>' ).text( name.slice( match.start, match.end ) ),
+				document.createTextNode( name.slice( match.end ) )
+			);
+		},
 
 		/**
 		 * Sort mode select; the server sorts, this only stores the choice.
@@ -241,6 +360,29 @@
 
 			this.$el.on( 'click', '.fmm-folder-subfolder', function() {
 				self.startEdit( 'new', String( $( this ).closest( 'li' ).data( 'folder' ) ) );
+			} );
+
+			this.$el.on( 'input search', '.fmm-search__input', function() {
+				self.setQuery( $( this ).val(), false );
+			} );
+
+			this.$el.on( 'keydown', '.fmm-search__input', function( event ) {
+				var $first;
+
+				if ( 'Escape' === event.key && $( this ).val() ) {
+					event.preventDefault();
+					event.stopPropagation();
+					$( this ).val( '' );
+					self.setQuery( '', true );
+				} else if ( 'ArrowDown' === event.key ) {
+					$first = self.$el.find( '.fmm-sidebar__item--folder .fmm-folder' ).first();
+					if ( $first.length ) {
+						event.preventDefault();
+						$first.trigger( 'focus' );
+					}
+				} else if ( 'Enter' === event.key ) {
+					event.preventDefault();
+				}
 			} );
 
 			this.$el.on( 'change', '.fmm-sort__select', function() {
@@ -990,12 +1132,12 @@
 
 			$folder = $( '<button type="button" class="fmm-folder"></button>' ).attr( 'data-fmm-key', 'folder-' + value ).append(
 					icon( iconName ),
-					$( '<span class="fmm-folder__name"></span>' ).text( name ),
+					this.nameElement( name, isFolder ),
 					$( '<span class="fmm-folder__count"></span>' ).text( count )
 						/* translators: %d: number of media items. */
 						.attr( 'aria-label', sprintf( _n( '%d item', '%d items', count, 'fena-media-manager' ), count ) )
 			);
-			if ( isFolder && store.canManage && ! selected && null === this.editing ) {
+			if ( isFolder && store.canManage && ! selected && null === this.editing && ! this.query ) {
 				$folder.attr( 'draggable', 'true' );
 			}
 			if ( node && _.contains( COLOR_PRESETS, node.folder.color ) ) {
@@ -1076,7 +1218,7 @@
 		menu: function( id ) {
 			var info = this.siblings( id );
 			var index = info ? _.indexOf( info.ids, id ) : -1;
-			var manual = 'manual' === store.sort;
+			var manual = 'manual' === store.sort && ! this.query;
 			var items = [ { className: 'fmm-folder-rename', icon: 'rename', key: 'rename-' + id, label: __( 'Rename', 'fena-media-manager' ) } ];
 
 			if ( window.HTMLDialogElement && HTMLDialogElement.prototype.showModal ) {
@@ -1107,7 +1249,7 @@
 		 * @return {jQuery} Button.
 		 */
 		toggleButton: function( folder ) {
-			var expanded = !! this.expanded[ String( folder.id ) ];
+			var expanded = !! this.query || !! this.expanded[ String( folder.id ) ];
 			var label = expanded ?
 				/* translators: %s: folder name. */
 				sprintf( __( 'Hide subfolders of “%s”', 'fena-media-manager' ), folder.name ) :
@@ -1116,6 +1258,7 @@
 
 			return $( '<button type="button" class="fmm-folder-toggle"></button>' )
 				.attr( { 'aria-expanded': String( expanded ), 'aria-label': label, title: label, 'data-fmm-key': 'toggle-' + folder.id } )
+				.prop( 'disabled', !! this.query )
 				.append( icon( expanded ? 'expanded' : 'collapsed' ) );
 		},
 
@@ -1157,8 +1300,9 @@
 			var focusKey = $( document.activeElement ).closest( this.$el ).length ? $( document.activeElement ).attr( 'data-fmm-key' ) : null;
 			var selected = this.selectedIds().length;
 			var tree = store.tree();
+			var visible = this.query ? this.searchVisible( tree ) : null;
 
-			if ( this.menuOpen && ( selected || null !== this.editing || ! store.get( this.menuOpen ) ) ) {
+			if ( this.menuOpen && ( selected || null !== this.editing || ! store.get( this.menuOpen ) || ( visible && ! visible[ this.menuOpen ] ) ) ) {
 				this.menuOpen = null;
 			}
 
@@ -1175,12 +1319,17 @@
 				$list.append( $( '<li class="fmm-sidebar__item fmm-sidebar__item--new"></li>' ).append( this.form( '' ) ) );
 			}
 
+			if ( visible && ! this.matchCount ) {
+				$list.append( $( '<li class="fmm-sidebar__item fmm-sidebar__empty"></li>' ).text( __( 'No folders found.', 'fena-media-manager' ) ) );
+			}
+
 			// Rows below a collapsed folder are not rendered; the folder filter is unaffected.
+			// While searching, matches and their ancestors are shown regardless of this.expanded.
 			_.each( tree, function( node ) {
 				var id = String( node.folder.id );
 				var $new;
 
-				if ( _.some( node.parents, function( parent ) {
+				if ( visible ? ! visible[ id ] : _.some( node.parents, function( parent ) {
 					return ! self.expanded[ parent ];
 				} ) ) {
 					return;
@@ -1210,11 +1359,35 @@
 
 			this.renderActive();
 
-			if ( this.$el.find( '.fmm-form__input' ).length ) {
+			if ( this.$el.find( '.fmm-form__input' ).length && document.activeElement !== this.$el.find( '.fmm-search__input' )[ 0 ] ) {
 				this.$el.find( '.fmm-form__input' ).trigger( 'focus' ).trigger( 'select' );
 			} else if ( focusKey ) {
 				this.focusKey( focusKey );
 			}
+		},
+
+		/**
+		 * Folders shown while searching: matches and all their ancestors.
+		 *
+		 * @param {Object[]} tree Nodes from store.tree().
+		 * @return {Object} Folder ID => true. Also sets this.matchCount.
+		 */
+		searchVisible: function( tree ) {
+			var self = this;
+			var visible = {};
+
+			this.matchCount = 0;
+			_.each( tree, function( node ) {
+				if ( self.findMatch( node.folder.name ) ) {
+					self.matchCount++;
+					visible[ String( node.folder.id ) ] = true;
+					_.each( node.parents, function( parent ) {
+						visible[ parent ] = true;
+					} );
+				}
+			} );
+
+			return visible;
 		},
 
 		renderActive: function() {
