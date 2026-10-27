@@ -19,6 +19,24 @@ class FMM_Installer {
 	const OPTION = 'fmm_defaults_seeded';
 
 	/**
+	 * Claims the seed marker. INSERT IGNORE succeeds for exactly one request.
+	 *
+	 * @return bool Whether this request created the marker.
+	 */
+	private static function claim() {
+		global $wpdb;
+
+		$autoload = function_exists( 'wp_determine_option_autoload_value' ) ? wp_determine_option_autoload_value( self::OPTION, FMM_VERSION, FMM_VERSION, 'yes' ) : 'yes';
+		$result   = $wpdb->query( $wpdb->prepare( "INSERT IGNORE INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, %s, %s)", self::OPTION, FMM_VERSION, $autoload ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Atomic claim.
+
+		wp_cache_delete( self::OPTION, 'options' );
+		wp_cache_delete( 'notoptions', 'options' );
+		wp_cache_delete( 'alloptions', 'options' );
+
+		return 1 === $result;
+	}
+
+	/**
 	 * Creates the default folders on the first admin request after activation.
 	 */
 	public static function maybe_seed() {
@@ -33,9 +51,10 @@ class FMM_Installer {
 			)
 		);
 
-		// add_option() fails when the row exists, so it doubles as a lock
-		// against two concurrent requests seeding at the same time.
-		if ( ! add_option( self::OPTION, FMM_VERSION, '', 'yes' ) || $existing > 0 ) {
+		// The marker doubles as a lock against concurrent requests. add_option()
+		// is not enough: its upsert reports success for the losing request too
+		// when the database client uses FOUND_ROWS, so the claim is atomic here.
+		if ( ! self::claim() || $existing > 0 ) {
 			return;
 		}
 
