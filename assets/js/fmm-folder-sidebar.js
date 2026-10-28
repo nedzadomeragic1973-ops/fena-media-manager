@@ -1226,19 +1226,26 @@
 		 * Shows a modal dialog; removed again when closed.
 		 *
 		 * @param {Object}   options
-		 * @param {string}   options.title    Title.
-		 * @param {jQuery}   options.body     Body content.
-		 * @param {string}   options.submit   Primary button label.
-		 * @param {Function} options.onSubmit Called with the dialog API on submit.
-		 * @param {string}   [options.focus]  data-fmm-key to focus after closing.
+		 * @param {string}   options.title            Title.
+		 * @param {jQuery}   options.body             Body content.
+		 * @param {string}   options.submit           Primary button label.
+		 * @param {Function} options.onSubmit         Called with the dialog API on submit.
+		 * @param {string}   [options.focus]          data-fmm-key to focus after closing.
+		 * @param {string}   [options.icon]           ICONS key shown in a round badge before the title.
+		 * @param {boolean}  [options.describe]       Whether the body describes the dialog (aria-describedby).
+		 * @param {string}   [options.initialFocus]   'cancel' to focus Cancel when opened.
+		 * @param {string}   [options.className]      Extra class for the <dialog>.
 		 * @return {Object} API: { close(), error( message ), busy( flag ) }.
 		 */
 		dialog: function( options ) {
 			var self = this;
 			var titleId = 'fmm-dialog-title';
-			var $dialog = $( '<dialog class="fmm fmm-dialog"></dialog>' ).attr( 'aria-labelledby', titleId );
+			var bodyId = 'fmm-dialog-body';
+			var $dialog = $( '<dialog class="fmm fmm-dialog"></dialog>' ).addClass( options.className ).attr( 'aria-labelledby', titleId );
 			var $error = $( '<p class="fmm-dialog__error" role="alert" hidden></p>' );
-			var $submit = $( '<button type="submit" class="button button-primary"></button>' ).text( options.submit );
+			var $submit = $( '<button type="submit" class="fmm-dialog__submit"></button>' ).text( options.submit );
+			var $cancel = $( '<button type="button" class="fmm-dialog__cancel"></button>' ).text( __( 'Cancel', 'fena-media-manager' ) );
+			var $title = $( '<h2 class="fmm-dialog__title"></h2>' ).attr( 'id', titleId ).text( options.title );
 			var api = {
 				$error: $error,
 				close: function() {
@@ -1252,15 +1259,21 @@
 				}
 			};
 
+			$cancel.on( 'click', api.close );
+			if ( options.describe ) {
+				$dialog.attr( 'aria-describedby', bodyId );
+			}
+
 			$dialog.append(
 				$( '<form method="dialog" class="fmm-dialog__form"></form>' ).append(
-					$( '<h2 class="fmm-dialog__title"></h2>' ).attr( 'id', titleId ).text( options.title ),
-					$( '<div class="fmm-dialog__body"></div>' ).append( options.body ),
+					options.icon ?
+						$( '<div class="fmm-dialog__header"></div>' ).append(
+							$( '<span class="fmm-dialog__badge" aria-hidden="true"></span>' ).addClass( 'fmm-dialog__badge--' + options.icon ).append( icon( options.icon ) ),
+							$title
+						) : $title,
+					$( '<div class="fmm-dialog__body"></div>' ).attr( 'id', options.describe ? bodyId : null ).append( options.body ),
 					$error,
-					$( '<div class="fmm-dialog__footer"></div>' ).append(
-						$submit,
-						$( '<button type="button" class="button fmm-dialog__cancel"></button>' ).text( __( 'Cancel', 'fena-media-manager' ) ).on( 'click', api.close )
-					)
+					$( '<div class="fmm-dialog__footer"></div>' ).append( $cancel, $submit )
 				).on( 'submit', function( event ) {
 					event.preventDefault();
 					options.onSubmit( api );
@@ -1273,12 +1286,15 @@
 			} );
 
 			$dialog.appendTo( document.body )[ 0 ].showModal();
+			if ( 'cancel' === options.initialFocus ) {
+				$cancel.trigger( 'focus' );
+			}
 
 			return api;
 		},
 
 		/**
-		 * "Color…" dialog of a folder: preset radios plus a custom color.
+		 * "Color…" dialog of a folder: a preview card, preset swatches and a custom color.
 		 *
 		 * @param {string} id Folder ID.
 		 */
@@ -1287,8 +1303,6 @@
 			var folder = store.get( id );
 			var current = folder ? folder.color || '' : '';
 			var custom = COLOR_HEX.test( current );
-			var $picker = $( '<input type="color" id="fmm-color-custom" />' ).val( custom ? current : DEFAULT_CUSTOM_COLOR );
-			var $fieldset = $( '<fieldset class="fmm-dialog__colors"></fieldset>' ).append( $( '<legend></legend>' ).text( __( 'Color', 'fena-media-manager' ) ) );
 			var options = [
 				{ value: 'gray', label: __( 'Gray (Default)', 'fena-media-manager' ) },
 				{ value: 'blue', label: __( 'Blue', 'fena-media-manager' ) },
@@ -1298,44 +1312,128 @@
 				{ value: 'custom', label: __( 'Custom', 'fena-media-manager' ) }
 			];
 			var selected = custom ? 'custom' : ( current || 'gray' );
+			var startHex = custom ? current : DEFAULT_CUSTOM_COLOR;
+			var $picker, $hex, $customRow, $customSwatch, $preview, $caption, $fieldset, $body;
 
 			if ( ! folder ) {
 				return;
 			}
 
+			$picker = $( '<input type="color" id="fmm-color-custom" />' ).val( startHex );
+			$hex = $( '<input type="text" id="fmm-color-hex" maxlength="7" spellcheck="false" autocomplete="off" />' ).attr( 'placeholder', DEFAULT_CUSTOM_COLOR ).val( startHex );
+			$caption = $( '<span class="fmm-appearance__caption"></span>' );
+			$preview = $( '<div class="fmm-appearance__preview"></div>' ).append(
+				iconEl( 'folder' ),
+				$( '<span class="fmm-appearance__name"></span>' ).text( folder.name ),
+				$caption
+			);
+			$preview.find( '.fmm-icon' ).addClass( 'fmm-appearance__icon' );
+			$fieldset = $( '<fieldset class="fmm-appearance__section"></fieldset>' ).append( $( '<legend></legend>' ).text( __( 'Color', 'fena-media-manager' ) ) );
+
+			function hexFrom( raw ) {
+				var value = $.trim( raw ).toLowerCase();
+				value = '#' === value.charAt( 0 ) ? value : '#' + value;
+				return COLOR_HEX.test( value ) ? value : '';
+			}
+
+			// Black or white check mark, whichever contrasts more with the color.
+			function checkColor( hex ) {
+				var c = [ 1, 3, 5 ].map( function( k ) {
+					var v = parseInt( hex.slice( k, k + 2 ), 16 ) / 255;
+					return v <= 0.03928 ? v / 12.92 : Math.pow( ( v + 0.055 ) / 1.055, 2.4 );
+				} );
+				return 0.2126 * c[ 0 ] + 0.7152 * c[ 1 ] + 0.0722 * c[ 2 ] > 0.5 ? 'var(--fmm-text)' : 'var(--fmm-on-primary)';
+			}
+
+			function choice() {
+				return $fieldset.find( 'input[name="fmm-color"]:checked' ).val();
+			}
+
+			function showCustom( hex ) {
+				$customSwatch[ 0 ].style.setProperty( '--fmm-folder-color', hex );
+				$customSwatch[ 0 ].style.setProperty( '--fmm-check', checkColor( hex ) );
+			}
+
+			function refresh() {
+				var value = choice();
+				var hex = hexFrom( $hex.val() ) || String( $picker.val() ).toLowerCase();
+
+				$customRow.prop( 'hidden', 'custom' !== value );
+				$preview.attr( 'data-fmm-color', 'custom' === value ? null : value );
+				if ( 'custom' === value ) {
+					$preview[ 0 ].style.setProperty( '--fmm-folder-color', hex );
+					/* translators: %s: color as a hex value, e.g. #7b61c9. */
+					$caption.text( sprintf( __( 'Custom · %s', 'fena-media-manager' ), hex ) );
+				} else {
+					$preview[ 0 ].style.removeProperty( '--fmm-folder-color' );
+					$caption.text( _.findWhere( options, { value: value } ).label );
+				}
+			}
+
 			_.each( options, function( option ) {
-				var $swatch = $( '<span class="fmm-swatch" aria-hidden="true"></span>' ).attr( 'data-fmm-color', 'custom' === option.value ? null : option.value );
-				var $label = $( '<label class="fmm-dialog__color"></label>' ).append(
+				var $swatch = $( '<span class="fmm-swatch" aria-hidden="true"></span>' ).attr( 'data-fmm-color', 'custom' === option.value ? null : option.value ).append( iconEl( 'check' ) );
+				var $label = $( '<label class="fmm-swatch-option"></label>' ).attr( 'title', option.label ).append(
 					$( '<input type="radio" name="fmm-color" />' ).val( option.value ).prop( 'checked', option.value === selected ),
 					$swatch,
-					$( '<span></span>' ).text( option.label )
+					$( '<span class="screen-reader-text"></span>' ).text( option.label )
 				);
 
 				if ( 'custom' === option.value ) {
-					$swatch[ 0 ].style.setProperty( '--fmm-folder-color', $picker.val() );
-					$fieldset.append( $( '<div class="fmm-dialog__color-row"></div>' ).append(
-						$label,
-						$( '<label class="screen-reader-text" for="fmm-color-custom"></label>' ).text( __( 'Custom color', 'fena-media-manager' ) ),
-						$picker.on( 'input change', function() {
-							$fieldset.find( 'input[value="custom"]' ).prop( 'checked', true );
-							$swatch[ 0 ].style.setProperty( '--fmm-folder-color', $picker.val() );
-						} )
-					) );
-					return;
+					$customSwatch = $swatch;
+					$label.addClass( 'fmm-swatch-option--custom' );
+					showCustom( startHex );
 				}
 				$fieldset.append( $label );
 			} );
+
+			$customRow = $( '<div class="fmm-appearance__custom"></div>' ).prop( 'hidden', 'custom' !== selected ).append(
+				$( '<label class="screen-reader-text" for="fmm-color-custom"></label>' ).text( __( 'Custom color', 'fena-media-manager' ) ),
+				$picker,
+				$( '<div class="fmm-dialog__field fmm-appearance__hex"></div>' ).append(
+					$( '<label for="fmm-color-hex"></label>' ).text( __( 'Hex', 'fena-media-manager' ) ),
+					$hex
+				)
+			);
+
+			$fieldset.on( 'change', 'input[name="fmm-color"]', refresh );
+			$picker.on( 'input change', function() {
+				var hex = String( $picker.val() ).toLowerCase();
+
+				$hex.val( hex );
+				$fieldset.find( 'input[value="custom"]' ).prop( 'checked', true );
+				showCustom( hex );
+				refresh();
+			} );
+			$hex.on( 'input', function() {
+				var hex = hexFrom( $hex.val() );
+
+				$fieldset.find( 'input[value="custom"]' ).prop( 'checked', true );
+				if ( hex ) {
+					$picker.val( hex );
+					showCustom( hex );
+				}
+				refresh();
+			} );
+
+			$body = $( '<div class="fmm-appearance"></div>' ).append( $preview, $fieldset, $customRow );
+			refresh();
 
 			this.dialog( {
 				/* translators: %s: folder name. */
 				title: sprintf( __( 'Color of folder “%s”', 'fena-media-manager' ), folder.name ),
 				submit: __( 'Save', 'fena-media-manager' ),
 				focus: 'folder-' + id,
-				body: $fieldset,
+				body: $body,
 				onSubmit: function( api ) {
-					var choice = $fieldset.find( 'input[name="fmm-color"]:checked' ).val();
-					var value = 'custom' === choice ? String( $picker.val() ).toLowerCase() : choice;
+					var picked = choice();
+					var hex = 'custom' === picked ? hexFrom( $hex.val() ) : '';
+					var value = 'custom' === picked ? hex : picked;
 
+					if ( 'custom' === picked && ! hex ) {
+						api.error( __( 'Enter a color as a hex value, e.g. #7b61c9.', 'fena-media-manager' ) );
+						$hex.trigger( 'focus' );
+						return;
+					}
 					if ( value === ( current || 'gray' ) ) {
 						api.close();
 						return;
@@ -1366,6 +1464,231 @@
 		},
 
 		/**
+		 * Folder dropdown following the WAI-ARIA "select-only combobox" pattern.
+		 *
+		 * @param {Object}   config
+		 * @param {string}   config.id       Combobox id.
+		 * @param {string}   config.labelId  Id of the label element.
+		 * @param {string}   config.listId   Listbox id.
+		 * @param {Object[]} config.options  { value, label, depth, color, path }.
+		 * @param {string}   config.value    Initially selected value.
+		 * @return {Object} { $el, value(), focus() }.
+		 */
+		folderPicker: function( config ) {
+			var options = config.options;
+			var value = config.value;
+			var active = 0;
+			var typed = '';
+			var typedTimer = 0;
+			var isOpen = false;
+			var $wrap = $( '<div class="fmm-picker"></div>' );
+			var $button = $( '<button type="button" class="fmm-picker__button" role="combobox" aria-haspopup="listbox" aria-expanded="false"></button>' )
+				.attr( { id: config.id, 'aria-controls': config.listId, 'aria-labelledby': config.labelId + ' ' + config.id } );
+			var $buttonIcon = $( '<span class="fmm-picker__icon" aria-hidden="true"></span>' );
+			var $buttonLabel = $( '<span class="fmm-picker__label"></span>' );
+			var $list = $( '<ul class="fmm-picker__list" role="listbox" tabindex="-1" hidden></ul>' ).attr( { id: config.listId, 'aria-labelledby': config.labelId } );
+			var $items = [];
+
+			function markColor( $el, color ) {
+				$el.attr( 'data-fmm-color', null );
+				$el[ 0 ].style.removeProperty( '--fmm-folder-color' );
+				if ( _.contains( COLOR_PRESETS, color ) ) {
+					$el.attr( 'data-fmm-color', color );
+				} else if ( COLOR_HEX.test( color || '' ) ) {
+					$el[ 0 ].style.setProperty( '--fmm-folder-color', color );
+				}
+			}
+
+			function indexOfValue( v ) {
+				return _.findIndex( options, function( option ) {
+					return option.value === v;
+				} );
+			}
+
+			function syncButton() {
+				var option = options[ indexOfValue( value ) ];
+
+				$buttonIcon.empty().append( iconEl( 'folder' ) ).toggleClass( 'fmm-picker__icon--plain', '0' === option.value );
+				markColor( $buttonIcon, option.color );
+				$buttonLabel.text( option.label );
+				$button.attr( 'data-value', option.value );
+				$items.forEach( function( $li, i ) {
+					$li.attr( 'aria-selected', String( options[ i ].value === value ) );
+				} );
+			}
+
+			function setActive( index ) {
+				var li;
+
+				active = Math.max( 0, Math.min( options.length - 1, index ) );
+				$items.forEach( function( $li, i ) {
+					$li.toggleClass( 'is-active', i === active );
+				} );
+				li = $items[ active ][ 0 ];
+				$button.attr( 'aria-activedescendant', li.id );
+				if ( li.offsetTop < $list[ 0 ].scrollTop ) {
+					$list[ 0 ].scrollTop = li.offsetTop - 4;
+				} else if ( li.offsetTop + li.offsetHeight > $list[ 0 ].scrollTop + $list[ 0 ].clientHeight ) {
+					$list[ 0 ].scrollTop = li.offsetTop + li.offsetHeight - $list[ 0 ].clientHeight + 4;
+				}
+			}
+
+			function onOutside( event ) {
+				if ( ! $( event.target ).closest( $wrap ).length ) {
+					close();
+				}
+			}
+
+			function open( index ) {
+				var rect = $button[ 0 ].getBoundingClientRect();
+				var below = window.innerHeight - rect.bottom - 22;
+				var above = rect.top - 22;
+				var up = below < 160 && above > below;
+
+				isOpen = true;
+				$button.attr( 'aria-expanded', 'true' );
+				$wrap.addClass( 'is-open' ).toggleClass( 'is-up', up );
+				$list.prop( 'hidden', false ).css( 'max-height', Math.max( 96, Math.min( 280, up ? above : below ) ) + 'px' );
+				setActive( undefined === index ? indexOfValue( value ) : index );
+				document.addEventListener( 'mousedown', onOutside, true );
+			}
+
+			function close() {
+				isOpen = false;
+				$button.attr( 'aria-expanded', 'false' ).removeAttr( 'aria-activedescendant' );
+				$wrap.removeClass( 'is-open is-up' );
+				$list.prop( 'hidden', true );
+				document.removeEventListener( 'mousedown', onOutside, true );
+			}
+
+			function choose( index ) {
+				value = options[ index ].value;
+				syncButton();
+				close();
+			}
+
+			function typeAhead( char ) {
+				var start = active;
+				var i, n, text;
+
+				typed += fold( char ).text;
+				clearTimeout( typedTimer );
+				typedTimer = setTimeout( function() {
+					typed = '';
+				}, 500 );
+				if ( 1 === typed.length || _.uniq( typed.split( '' ) ).length === 1 ) {
+					start = active + 1;
+					text = typed.charAt( 0 );
+				} else {
+					text = typed;
+				}
+				for ( n = 0; n < options.length; n++ ) {
+					i = ( start + n ) % options.length;
+					if ( 0 === fold( options[ i ].label ).text.indexOf( text ) ) {
+						return i;
+					}
+				}
+				return -1;
+			}
+
+			_.each( options, function( option, i ) {
+				var $icon = $( '<span class="fmm-picker__icon" aria-hidden="true"></span>' ).append( iconEl( 'folder' ) ).toggleClass( 'fmm-picker__icon--plain', '0' === option.value );
+				var $li = $( '<li class="fmm-picker__option" role="option"></li>' ).attr( { id: config.listId + '-opt-' + option.value, 'data-value': option.value, 'aria-selected': 'false' } )
+					.css( 'padding-inline-start', ( 10 + option.depth * 16 ) + 'px' )
+					.append( $icon, $( '<span class="fmm-picker__name"></span>' ).text( option.label ), iconEl( 'check' ) );
+
+				markColor( $icon, option.color );
+				if ( option.path ) {
+					/* translators: %s: parent folder path, e.g. "Campaigns › 2025". */
+					$li.find( '.fmm-picker__name' ).after( $( '<span class="screen-reader-text"></span>' ).text( ', ' + sprintf( __( 'in %s', 'fena-media-manager' ), option.path ) ) );
+				}
+				$li.on( 'mousedown', function( event ) {
+					event.preventDefault();
+				} ).on( 'click', function() {
+					choose( i );
+					$button.trigger( 'focus' );
+				} );
+				$items.push( $li );
+				$list.append( $li );
+			} );
+
+			$button.append( $buttonIcon, $buttonLabel, iconEl( 'expanded' ) ).on( 'click', function() {
+				if ( isOpen ) {
+					close();
+				} else {
+					open();
+				}
+			} ).on( 'keydown', function( event ) {
+				var key = event.key;
+				var printable = 1 === key.length && ' ' !== key && ! event.ctrlKey && ! event.metaKey && ! event.altKey;
+				var found;
+
+				if ( ! isOpen ) {
+					if ( 'Enter' === key || ' ' === key || 'ArrowDown' === key || 'ArrowUp' === key ) {
+						event.preventDefault();
+						open();
+					} else if ( 'Home' === key || 'End' === key ) {
+						event.preventDefault();
+						open( 'Home' === key ? 0 : options.length - 1 );
+					} else if ( printable ) {
+						event.preventDefault();
+						found = typeAhead( key );
+						open( found < 0 ? undefined : found );
+					}
+					return;
+				}
+
+				if ( 'Escape' === key ) {
+					event.preventDefault();
+					event.stopPropagation();
+					close();
+				} else if ( 'Tab' === key ) {
+					choose( active );
+				} else if ( 'Enter' === key || ' ' === key || ( event.altKey && 'ArrowUp' === key ) ) {
+					event.preventDefault();
+					choose( active );
+				} else if ( 'ArrowDown' === key ) {
+					event.preventDefault();
+					setActive( active + 1 );
+				} else if ( 'ArrowUp' === key ) {
+					event.preventDefault();
+					setActive( active - 1 );
+				} else if ( 'Home' === key ) {
+					event.preventDefault();
+					setActive( 0 );
+				} else if ( 'End' === key ) {
+					event.preventDefault();
+					setActive( options.length - 1 );
+				} else if ( 'PageDown' === key ) {
+					event.preventDefault();
+					setActive( active + 10 );
+				} else if ( 'PageUp' === key ) {
+					event.preventDefault();
+					setActive( active - 10 );
+				} else if ( printable ) {
+					event.preventDefault();
+					found = typeAhead( key );
+					if ( found >= 0 ) {
+						setActive( found );
+					}
+				}
+			} );
+
+			$wrap.append( $button, $list );
+			syncButton();
+
+			return {
+				$el: $wrap,
+				value: function() {
+					return value;
+				},
+				focus: function() {
+					$button.trigger( 'focus' );
+				}
+			};
+		},
+
+		/**
 		 * "Move to…" dialog of a folder.
 		 *
 		 * @param {string} id Folder ID.
@@ -1374,20 +1697,34 @@
 			var self = this;
 			var folder = store.get( id );
 			var node = this.node( id );
-			var current, $select, $name, $nameField;
+			var current, picker, $name, $nameField, pickerOptions;
 
 			if ( ! folder || ! node ) {
 				return;
 			}
 
 			current = this.parentOf( node );
-			$select = $( '<select id="fmm-move-target"></select>' ).append( $( '<option value="0"></option>' ).text( __( 'Top level', 'fena-media-manager' ) ) );
+			pickerOptions = [ { value: '0', label: __( 'Top level', 'fena-media-manager' ), depth: 0, color: '', path: '' } ];
 			_.each( store.tree(), function( other ) {
 				if ( String( other.folder.id ) !== id && ! _.contains( other.parents, id ) ) {
-					$select.append( $( '<option></option>' ).val( String( other.folder.id ) ).text( new Array( other.depth + 1 ).join( '— ' ) + other.folder.name ) );
+					pickerOptions.push( {
+						value: String( other.folder.id ),
+						label: other.folder.name,
+						depth: other.depth + 1,
+						color: other.folder.color || '',
+						path: _.map( other.parents, function( parent ) {
+							return ( store.get( parent ) || {} ).name;
+						} ).join( ' › ' )
+					} );
 				}
 			} );
-			$select.val( current );
+			picker = this.folderPicker( {
+				id: 'fmm-move-target',
+				labelId: 'fmm-move-target-label',
+				listId: 'fmm-move-listbox',
+				options: pickerOptions,
+				value: _.some( pickerOptions, { value: current } ) ? current : '0'
+			} );
 
 			$name = $( '<input type="text" id="fmm-move-name" maxlength="200" />' ).val( folder.name );
 			$nameField = $( '<div class="fmm-dialog__field" hidden></div>' ).append(
@@ -1399,16 +1736,17 @@
 				/* translators: %s: folder name. */
 				title: sprintf( __( 'Move folder “%s”', 'fena-media-manager' ), folder.name ),
 				submit: __( 'Move', 'fena-media-manager' ),
+				className: 'fmm-dialog--move',
 				focus: 'folder-' + id,
 				body: [
 					$( '<div class="fmm-dialog__field"></div>' ).append(
-						$( '<label for="fmm-move-target"></label>' ).text( __( 'Destination', 'fena-media-manager' ) ),
-						$select
+						$( '<label id="fmm-move-target-label"></label>' ).text( __( 'Destination', 'fena-media-manager' ) ).on( 'click', picker.focus ),
+						picker.$el
 					),
 					$nameField
 				],
 				onSubmit: function( api ) {
-					var target = $select.val();
+					var target = picker.value();
 					var renaming = ! $nameField.prop( 'hidden' );
 					var name = renaming ? $.trim( $name.val() ) : '';
 					var destination = store.get( target );
@@ -2278,6 +2616,33 @@
 			var folder = store.get( id );
 			var message;
 
+			function run( api ) {
+				self.menuOpen = null;
+				self.busy = true;
+				wp.apiFetch( { path: '/fmm/v1/folders/' + id, method: 'DELETE' } ).then( function() {
+					self.busy = false;
+					if ( api ) {
+						api.close();
+					}
+					if ( self.current() === String( id ) ) {
+						self.library.props.set( PROP, null );
+					}
+					/* translators: %s: folder name. */
+					self.notice( sprintf( __( 'Folder “%s” deleted.', 'fena-media-manager' ), folder.name ), 'success' );
+					return store.refresh().then( function() {
+						self.focusKey( 'folder-' );
+					} );
+				} ).catch( function( error ) {
+					if ( api ) {
+						self.busy = false;
+						api.busy( false );
+						api.error( ( error && error.message ) || __( 'The folder could not be deleted.', 'fena-media-manager' ) );
+						return;
+					}
+					self.fail( error );
+				} );
+			}
+
 			if ( ! folder || this.busy ) {
 				return;
 			}
@@ -2289,25 +2654,31 @@
 			} ) ) {
 				message += ' ' + __( 'Its subfolders move up one level.', 'fena-media-manager' );
 			}
-			if ( ! window.confirm( message ) ) {
+
+			if ( window.HTMLDialogElement && HTMLDialogElement.prototype.showModal ) {
+				this.dialog( {
+					title: __( 'Delete folder', 'fena-media-manager' ),
+					icon: 'delete',
+					describe: true,
+					initialFocus: 'cancel',
+					body: $( '<p></p>' ).text( message ),
+					submit: __( 'Delete', 'fena-media-manager' ),
+					focus: 'folder-' + id,
+					onSubmit: function( api ) {
+						if ( self.busy ) {
+							return;
+						}
+						api.error( '' );
+						api.busy( true );
+						run( api );
+					}
+				} );
 				return;
 			}
 
-			this.menuOpen = null;
-			this.busy = true;
-			wp.apiFetch( { path: '/fmm/v1/folders/' + id, method: 'DELETE' } ).then( function() {
-				self.busy = false;
-				if ( self.current() === String( id ) ) {
-					self.library.props.set( PROP, null );
-				}
-				/* translators: %s: folder name. */
-				self.notice( sprintf( __( 'Folder “%s” deleted.', 'fena-media-manager' ), folder.name ), 'success' );
-				return store.refresh().then( function() {
-					self.focusKey( 'folder-' );
-				} );
-			} ).catch( function( error ) {
-				self.fail( error );
-			} );
+			if ( window.confirm( message ) ) {
+				run( null );
+			}
 		},
 
 		/**
