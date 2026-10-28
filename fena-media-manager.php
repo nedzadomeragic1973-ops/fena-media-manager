@@ -26,6 +26,7 @@ require_once FMM_PATH . 'includes/class-fmm-transfer.php';
 require_once FMM_PATH . 'includes/class-fmm-installer.php';
 require_once FMM_PATH . 'includes/class-fmm-rest.php';
 require_once FMM_PATH . 'includes/class-fmm-attachment-fields.php';
+require_once FMM_PATH . 'includes/class-fmm-icons.php';
 require_once FMM_PATH . 'includes/class-fmm-library.php';
 require_once FMM_PATH . 'includes/class-fmm-list-mode.php';
 

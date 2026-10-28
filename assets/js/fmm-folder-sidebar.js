@@ -30,31 +30,43 @@
 	var DEFAULT_CUSTOM_COLOR = '#7b61c9';
 
 	/*
-	 * Logical icon names, mapped to Dashicons for now. Replacing this map
-	 * (e.g. with local SVGs) is the only change needed for new icons.
+	 * Logical icon names, mapped to Heroicons symbols of the inline sprite
+	 * (FMM_Icons, id "fmm-i-<name>").
 	 */
 	var ICONS = {
-		all: 'admin-media',
-		unassigned: 'marker',
-		folder: 'category',
-		'folder-plus': 'plus-alt2',
+		all: 'photo',
+		unassigned: 'inbox',
+		folder: 'folder',
+		'folder-open': 'folder-open',
+		'folder-plus': 'plus',
 		'folder-minus': 'minus',
-		'folder-move': 'arrow-right-alt',
-		create: 'plus-alt2',
-		subfolder: 'plus-alt2',
-		collapsed: 'arrow-right-alt2',
-		expanded: 'arrow-down-alt2',
-		rename: 'edit',
-		more: 'ellipsis',
-		'move-to': 'move',
-		color: 'art',
-		'move-up': 'arrow-up-alt2',
-		'move-down': 'arrow-down-alt2',
+		'folder-move': 'arrow-right',
+		create: 'folder-plus',
+		subfolder: 'plus',
+		collapsed: 'chevron-right',
+		expanded: 'chevron-down',
+		rename: 'pencil-square',
+		more: 'ellipsis-horizontal',
+		'move-to': 'folder-arrow-down',
+		color: 'swatch',
+		'move-up': 'arrow-up',
+		'move-down': 'arrow-down',
 		'delete': 'trash'
 	};
 
+	var SVG_NS = 'http://www.w3.org/2000/svg';
+
 	function icon( name ) {
-		return $( '<span aria-hidden="true"></span>' ).addClass( 'dashicons dashicons-' + ( ICONS[ name ] || name ) );
+		var svg = document.createElementNS( SVG_NS, 'svg' );
+		var use = document.createElementNS( SVG_NS, 'use' );
+
+		svg.setAttribute( 'class', 'fmm-icon fmm-icon--' + name );
+		svg.setAttribute( 'aria-hidden', 'true' );
+		svg.setAttribute( 'focusable', 'false' );
+		use.setAttribute( 'href', '#fmm-i-' + ( ICONS[ name ] || name ) );
+		svg.appendChild( use );
+
+		return $( svg );
 	}
 
 	/**
@@ -1193,7 +1205,7 @@
 			}
 
 			$folder = $( '<button type="button" class="fmm-folder"></button>' ).attr( 'data-fmm-key', 'folder-' + value ).append(
-					icon( iconName ),
+					icon( isFolder && 'folder' === iconName && String( value ) === this.current() ? 'folder-open' : iconName ),
 					this.nameElement( name, isFolder ),
 					$( '<span class="fmm-folder__count"></span>' ).text( count )
 						/* translators: %d: number of media items. */
@@ -1460,6 +1472,15 @@
 				var active = String( $item.data( 'folder' ) ) === current;
 				$item.toggleClass( 'is-active', active );
 				$item.find( '.fmm-folder' ).attr( 'aria-current', active ? 'true' : null );
+
+				if ( $item.hasClass( 'fmm-sidebar__item--folder' ) ) {
+					var use = $item.find( '.fmm-folder .fmm-icon use' )[ 0 ];
+					var href = '#fmm-i-' + ( active ? 'folder-open' : 'folder' );
+
+					if ( use && use.getAttribute( 'href' ) !== href ) {
+						use.setAttribute( 'href', href );
+					}
+				}
 			} );
 		},
 

@@ -98,6 +98,10 @@ Return a capability that only trusted roles have, never `read` or
 `upload_files`. Assigning media is not affected; it always requires
 `upload_files` plus permission to edit the media file.
 
+== Credits ==
+
+Interface icons: Heroicons by Tailwind Labs, Inc. (https://heroicons.com), MIT License.
+
 == Changelog ==
 
 = 1.0.0 =

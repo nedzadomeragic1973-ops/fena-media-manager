@@ -137,6 +137,7 @@ class FMM_Library {
 			true
 		);
 		wp_set_script_translations( 'fmm-folder-sidebar', 'fena-media-manager', FMM_PATH . 'languages' );
+		add_action( 'admin_footer', array( 'FMM_Icons', 'print_sprite' ) );
 	}
 
 	/**

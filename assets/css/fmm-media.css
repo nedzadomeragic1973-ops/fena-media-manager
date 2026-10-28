@@ -96,10 +96,21 @@
 	gap: 2px;
 }
 
-.fmm-sidebar__new .dashicons {
+.fmm .fmm-icon {
+	display: block;
+	flex: none;
+	width: 20px;
+	height: 20px;
+	color: inherit;
+}
+
+.fmm .fmm-icon use {
+	pointer-events: none;
+}
+
+.fmm-sidebar__new .fmm-icon {
 	width: 16px;
 	height: 16px;
-	font-size: 16px;
 }
 
 /* Folder search */
@@ -223,10 +234,13 @@
 	box-shadow: none;
 }
 
-.fmm-folder-toggle .dashicons {
+.fmm-folder-toggle .fmm-icon {
 	width: 16px;
 	height: 16px;
-	font-size: 16px;
+}
+
+.rtl .fmm .fmm-folder-toggle[aria-expanded="false"] .fmm-icon {
+	transform: scaleX(-1);
 }
 
 .fmm-sidebar.has-tree .fmm-folder {
@@ -265,7 +279,7 @@
 	box-shadow: none;
 }
 
-.fmm-folder .dashicons {
+.fmm-folder .fmm-icon {
 	flex: none;
 	color: var(--fmm-text-muted);
 }
@@ -287,7 +301,7 @@
 	--fmm-folder-color: var(--fmm-color-green);
 }
 
-.fmm-sidebar .fmm-sidebar__item.fmm-sidebar__item--folder .fmm-folder .dashicons {
+.fmm-sidebar .fmm-sidebar__item.fmm-sidebar__item--folder .fmm-folder .fmm-icon {
 	color: var(--fmm-folder-color, var(--fmm-color-gray));
 }
 
@@ -386,11 +400,10 @@
 	color: var(--fmm-danger);
 }
 
-.fmm-folder__actions .dashicons,
-.fmm-folder__assign .dashicons {
+.fmm-folder__actions .fmm-icon,
+.fmm-folder__assign .fmm-icon {
 	width: 16px;
 	height: 16px;
-	font-size: 16px;
 }
 
 /* Actions menu (inline disclosure inside the folder row) */
@@ -440,15 +453,14 @@
 	box-shadow: none;
 }
 
-.fmm-menu__item .dashicons {
+.fmm-menu__item .fmm-icon {
 	width: 16px;
 	height: 16px;
-	font-size: 16px;
 	color: var(--fmm-text-muted);
 }
 
-.fmm-sidebar .fmm-menu .fmm-folder-delete:hover .dashicons,
-.fmm-sidebar .fmm-menu .fmm-folder-delete:focus .dashicons {
+.fmm-sidebar .fmm-menu .fmm-folder-delete:hover .fmm-icon,
+.fmm-sidebar .fmm-menu .fmm-folder-delete:focus .fmm-icon {
 	color: inherit;
 }
 
@@ -753,5 +765,18 @@ select#media-attachment-filters ~ select#fmm-attachment-folder-filter {
 	.fmm-folder {
 		padding-top: 10px;
 		padding-bottom: 10px;
+	}
+}
+
+@media (forced-colors: active) {
+
+	.fmm .fmm-icon,
+	.fmm-sidebar .fmm-sidebar__item.fmm-sidebar__item--folder .fmm-folder .fmm-icon {
+		color: CanvasText;
+	}
+
+	.fmm .fmm-sidebar__item.is-active .fmm-icon,
+	.fmm-sidebar .fmm-sidebar__item.fmm-sidebar__item--folder.is-active .fmm-folder .fmm-icon {
+		color: Highlight;
 	}
 }
