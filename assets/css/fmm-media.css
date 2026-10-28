@@ -199,6 +199,11 @@
 	padding-left: calc(var(--fmm-depth, 0) * 16px);
 }
 
+/* Leaf rows have no chevron button: pad by its width (20px + 4px margin) while the tree has any. */
+.fmm-sidebar.has-tree .fmm-sidebar__item--leaf {
+	padding-left: calc(var(--fmm-depth, 0) * 16px + 24px);
+}
+
 .fmm-folder-toggle {
 	display: flex;
 	flex: none;

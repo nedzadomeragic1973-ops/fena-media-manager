@@ -25,6 +25,8 @@
 	var PROP = fmm.prop;
 	var DRAG_TYPE = 'application/x-fmm-media';
 	var FOLDER_DRAG_TYPE = 'application/x-fmm-folder';
+	// Hover-capable desktop after a real pointer has been used: row actions are created on demand (see needsActions()).
+	var LAZY_QUERY = '(hover: hover) and (pointer: fine) and (min-width: 783px)';
 	var COLOR_PRESETS = [ 'blue', 'violet', 'sand', 'green' ];
 	var COLOR_HEX = /^#[0-9a-f]{6}$/i;
 	var DEFAULT_CUSTOM_COLOR = '#7b61c9';
@@ -56,17 +58,113 @@
 
 	var SVG_NS = 'http://www.w3.org/2000/svg';
 
+	var iconCache = {};
+
+	function iconEl( name ) {
+		var node = iconCache[ name ];
+		var use;
+
+		if ( ! node ) {
+			node = iconCache[ name ] = document.createElementNS( SVG_NS, 'svg' );
+			use = document.createElementNS( SVG_NS, 'use' );
+			node.setAttribute( 'class', 'fmm-icon fmm-icon--' + name );
+			node.setAttribute( 'aria-hidden', 'true' );
+			node.setAttribute( 'focusable', 'false' );
+			use.setAttribute( 'href', '#fmm-i-' + ( ICONS[ name ] || name ) );
+			node.appendChild( use );
+		}
+
+		return node.cloneNode( true );
+	}
+
 	function icon( name ) {
-		var svg = document.createElementNS( SVG_NS, 'svg' );
-		var use = document.createElementNS( SVG_NS, 'use' );
+		return $( iconEl( name ) );
+	}
 
-		svg.setAttribute( 'class', 'fmm-icon fmm-icon--' + name );
-		svg.setAttribute( 'aria-hidden', 'true' );
-		svg.setAttribute( 'focusable', 'false' );
-		use.setAttribute( 'href', '#fmm-i-' + ( ICONS[ name ] || name ) );
-		svg.appendChild( use );
+	function tag( name, className, type ) {
+		var el = document.createElement( name );
 
-		return $( svg );
+		if ( className ) {
+			el.className = className;
+		}
+		if ( type ) {
+			el.setAttribute( 'type', type );
+		}
+
+		return el;
+	}
+
+	/*
+	 * Row building blocks are cloned (cloneNode) instead of parsed from HTML
+	 * strings; strings that do not depend on the row are translated once.
+	 */
+	var TPL = null;
+	var STR = null;
+	var actionTpl = {};
+	var countLabels = {};
+
+	function templates() {
+		var folder;
+
+		if ( ! TPL ) {
+			folder = tag( 'button', 'fmm-folder', 'button' );
+			folder.appendChild( tag( 'span', 'fmm-folder__name' ) );
+			folder.appendChild( tag( 'span', 'fmm-folder__count' ) );
+			TPL = {
+				li: tag( 'li', 'fmm-sidebar__item' ),
+				folder: folder,
+				toggle: tag( 'button', 'fmm-folder-toggle', 'button' ),
+				actions: tag( 'span', 'fmm-folder__actions' ),
+				assign: tag( 'span', 'fmm-folder__assign' )
+			};
+		}
+
+		return TPL;
+	}
+
+	function strings() {
+		return STR || ( STR = {
+			/* translators: %s: folder name. */
+			subfolder: __( 'New subfolder in “%s”', 'fena-media-manager' ),
+			/* translators: %s: folder name. */
+			more: __( 'More actions for “%s”', 'fena-media-manager' ),
+			/* translators: %s: folder name. */
+			hide: __( 'Hide subfolders of “%s”', 'fena-media-manager' ),
+			/* translators: %s: folder name. */
+			show: __( 'Show subfolders of “%s”', 'fena-media-manager' )
+		} );
+	}
+
+	function countLabel( count ) {
+		/* translators: %d: number of media items. */
+		return countLabels[ count ] || ( countLabels[ count ] = sprintf( _n( '%d item', '%d items', count, 'fena-media-manager' ), count ) );
+	}
+
+	// Assign button labels: the plural form depends on the selection size, so the format is chosen once per pass.
+	function addLabel( ctx, name ) {
+		/* translators: 1: number of media files, 2: folder name. */
+		ctx.addFmt = ctx.addFmt || _n( 'Add %1$d selected media file to “%2$s”', 'Add %1$d selected media files to “%2$s”', ctx.selected, 'fena-media-manager' );
+		return sprintf( ctx.addFmt, ctx.selected, name );
+	}
+
+	function moveLabel( ctx, name ) {
+		/* translators: 1: number of media files, 2: source folder name, 3: target folder name. */
+		ctx.moveFmt = ctx.moveFmt || _n( 'Move %1$d selected media file from “%2$s” to “%3$s”', 'Move %1$d selected media files from “%2$s” to “%3$s”', ctx.selected, 'fena-media-manager' );
+		return sprintf( ctx.moveFmt, ctx.selected, ctx.sourceName, name );
+	}
+
+	function removeLabel( count, name ) {
+		/* translators: 1: number of media files, 2: folder name. */
+		return sprintf( _n( 'Remove %1$d selected media file from “%2$s”', 'Remove %1$d selected media files from “%2$s”', count, 'fena-media-manager' ), count, name );
+	}
+
+	/*
+	 * Folder value of a sidebar row ('' = All Media, 'none', or an ID). Read
+	 * with attr(): jQuery's data() would cache on the element and make
+	 * emptying the list walk jQuery's data store for every row.
+	 */
+	function rowValue( el ) {
+		return String( $( el ).closest( 'li' ).attr( 'data-folder' ) );
 	}
 
 	/**
@@ -129,6 +227,17 @@
 		this.query = ''; // Normalized folder search query; never persisted.
 		this.matchCount = 0;
 		this.announceTimer = null;
+		this.foldCache = Object.create( null );
+		this.activeRow = null; // Row element of the active folder.
+		this.selectionFrame = 0;
+		this.searchTimer = 0;
+		this.mq = window.matchMedia ? window.matchMedia( LAZY_QUERY ) : null;
+		this.pointerSeen = false; // Keyboard and screen reader users keep every row action in the DOM.
+		this.lazy = this.lazyWanted();
+		this.hoverId = null; // Folder row under the pointer (lazy actions).
+		this.focusRowId = null; // Folder row containing the focus.
+		this.prepId = null; // Row whose actions must exist for an imminent focus move.
+		this.lastFolderId = null; // Last rendered folder row: always has its actions (entry point for Shift+Tab).
 
 		if ( store.treeExpanded ) {
 			_.each( store.tree(), function( node ) {
@@ -157,6 +266,7 @@
 			'<p class="fmm-sidebar__selection" hidden></p>',
 			'<ul class="fmm-sidebar__list"></ul>'
 		);
+		this.list = this.$el.find( '.fmm-sidebar__list' )[ 0 ];
 
 		this.bind();
 		this.bindDrag();
@@ -218,15 +328,39 @@
 		},
 
 		/**
-		 * Applies the search field value and re-renders at once.
+		 * Stores the search field value; the list renders 120 ms after the
+		 * last input (at once when cleared), or earlier through flushSearch().
 		 *
 		 * @param {string}  raw     Field value.
 		 * @param {boolean} cleared Whether the search was cleared with Escape.
 		 */
 		setQuery: function( raw, cleared ) {
+			var self = this;
+
 			this.query = fold( $.trim( raw ) ).text;
+			clearTimeout( this.searchTimer );
+			this.searchTimer = 0;
+			if ( cleared ) {
+				this.render();
+				this.announceSearch( true );
+				return;
+			}
+			this.searchTimer = setTimeout( function() {
+				self.flushSearch();
+			}, 120 );
+		},
+
+		/**
+		 * Renders a pending search now (Enter, ArrowDown, drag start).
+		 */
+		flushSearch: function() {
+			if ( ! this.searchTimer ) {
+				return;
+			}
+			clearTimeout( this.searchTimer );
+			this.searchTimer = 0;
 			this.render();
-			this.announceSearch( cleared );
+			this.announceSearch( false );
 		},
 
 		/**
@@ -239,7 +373,8 @@
 
 			clearTimeout( this.announceTimer );
 			this.announceTimer = setTimeout( function() {
-				if ( ! wp.a11y ) {
+				// A newer query is waiting to render; it announces its own result.
+				if ( ! wp.a11y || self.searchTimer ) {
 					return;
 				}
 				if ( self.query ) {
@@ -251,6 +386,16 @@
 					wp.a11y.speak( __( 'Search cleared.', 'fena-media-manager' ), 'polite' );
 				}
 			}, 400 );
+		},
+
+		/**
+		 * Cached fold() of a folder name (reset when the store changes).
+		 *
+		 * @param {string} name Folder name.
+		 * @return {Object} See fold().
+		 */
+		folded: function( name ) {
+			return this.foldCache[ name ] || ( this.foldCache[ name ] = fold( name ) );
 		},
 
 		/**
@@ -266,32 +411,33 @@
 				return null;
 			}
 
-			folded = fold( name );
+			folded = this.folded( name );
 			index = folded.text.indexOf( this.query );
 
 			return index < 0 ? null : { start: folded.map[ index ], end: folded.map[ index + this.query.length - 1 ] + 1 };
 		},
 
 		/**
-		 * Folder name element; the search match is wrapped in <mark> (text nodes only).
+		 * Fills the folder name element; the search match is wrapped in <mark> (text nodes only).
 		 *
+		 * @param {Element} el        Name element.
 		 * @param {string}  name      Folder name.
 		 * @param {boolean} highlight Whether to mark the search match.
-		 * @return {jQuery} Name element.
 		 */
-		nameElement: function( name, highlight ) {
-			var $name = $( '<span class="fmm-folder__name"></span>' );
+		fillName: function( el, name, highlight ) {
 			var match = highlight ? this.findMatch( name ) : null;
+			var mark;
 
 			if ( ! match ) {
-				return $name.text( name );
+				el.textContent = name;
+				return;
 			}
 
-			return $name.append(
-				document.createTextNode( name.slice( 0, match.start ) ),
-				$( '<mark class="fmm-search__mark"></mark>' ).text( name.slice( match.start, match.end ) ),
-				document.createTextNode( name.slice( match.end ) )
-			);
+			mark = tag( 'mark', 'fmm-search__mark' );
+			mark.textContent = name.slice( match.start, match.end );
+			el.appendChild( document.createTextNode( name.slice( 0, match.start ) ) );
+			el.appendChild( mark );
+			el.appendChild( document.createTextNode( name.slice( match.end ) ) );
 		},
 
 		/**
@@ -325,9 +471,7 @@
 		 * @return {Object|undefined} Node from store.tree().
 		 */
 		node: function( id ) {
-			return _.find( store.tree(), function( node ) {
-				return String( node.folder.id ) === String( id );
-			} );
+			return store.node( id );
 		},
 
 		/**
@@ -398,24 +542,42 @@
 		},
 
 		/**
-		 * How many selected items are already in a folder.
+		 * How many selected items are in each folder.
 		 *
-		 * @param {number} folderId Folder ID.
-		 * @return {number} Count.
+		 * @return {Object} Folder ID => count.
 		 */
-		selectedInFolder: function( folderId ) {
-			return this.selection ? this.selection.filter( function( model ) {
-				return _.contains( _.map( model.get( 'fmmFolders' ) || [], Number ), Number( folderId ) );
-			} ).length : 0;
+		selectedCounts: function() {
+			var counts = {};
+
+			if ( this.selection ) {
+				this.selection.each( function( model ) {
+					var seen = {};
+
+					_.each( model.get( 'fmmFolders' ) || [], function( id ) {
+						var key = String( Number( id ) );
+
+						if ( ! seen[ key ] ) {
+							seen[ key ] = true;
+							counts[ key ] = ( counts[ key ] || 0 ) + 1;
+						}
+					} );
+				} );
+			}
+
+			return counts;
 		},
 
 		bind: function() {
 			var self = this;
+			var moveEvent, onMove;
 
+			store.on( 'change', function() {
+				this.foldCache = Object.create( null );
+			}, this );
 			store.on( 'change', this.render, this );
-			this.library.props.on( 'change:' + PROP, this.render, this );
+			this.library.props.on( 'change:' + PROP, this.folderChanged, this );
 			if ( this.selection ) {
-				this.selection.on( 'add remove reset change:fmmFolders', this.render, this );
+				this.selection.on( 'add remove reset change:fmmFolders', this.queueSelection, this );
 			}
 
 			this.$el.on( 'click', '.fmm-sidebar__new', function() {
@@ -423,17 +585,17 @@
 			} );
 
 			this.$el.on( 'click', '.fmm-folder', function() {
-				var value = String( $( this ).closest( 'li' ).data( 'folder' ) );
+				var value = rowValue( this );
 				self.library.props.set( PROP, '' === value ? null : value );
 			} );
 
 			// Separate button: expanding never selects the folder.
 			this.$el.on( 'click', '.fmm-folder-toggle[aria-expanded]', function() {
-				self.toggleFolder( String( $( this ).closest( 'li' ).data( 'folder' ) ) );
+				self.toggleFolder( rowValue( this ) );
 			} );
 
 			this.$el.on( 'click', '.fmm-folder-subfolder', function() {
-				self.startEdit( 'new', String( $( this ).closest( 'li' ).data( 'folder' ) ) );
+				self.startEdit( 'new', rowValue( this ) );
 			} );
 
 			this.$el.on( 'input search', '.fmm-search__input', function() {
@@ -449,6 +611,7 @@
 					$( this ).val( '' );
 					self.setQuery( '', true );
 				} else if ( 'ArrowDown' === event.key ) {
+					self.flushSearch();
 					$first = self.$el.find( '.fmm-sidebar__item--folder .fmm-folder' ).first();
 					if ( $first.length ) {
 						event.preventDefault();
@@ -456,6 +619,7 @@
 					}
 				} else if ( 'Enter' === event.key ) {
 					event.preventDefault();
+					self.flushSearch();
 				}
 			} );
 
@@ -475,32 +639,32 @@
 			} );
 
 			this.$el.on( 'click', '.fmm-folder-menu-toggle', function() {
-				var id = String( $( this ).closest( 'li' ).data( 'folder' ) );
+				var id = rowValue( this );
 				self.menuOpen = self.menuOpen === id ? null : id;
 				self.render();
 				self.focusKey( 'menu-' + id );
 			} );
 
 			this.$el.on( 'click', '.fmm-folder-moveto', function() {
-				var id = String( $( this ).closest( 'li' ).data( 'folder' ) );
+				var id = rowValue( this );
 				self.menuOpen = null;
 				self.render();
 				self.openMoveDialog( id );
 			} );
 
 			this.$el.on( 'click', '.fmm-folder-color', function() {
-				var id = String( $( this ).closest( 'li' ).data( 'folder' ) );
+				var id = rowValue( this );
 				self.menuOpen = null;
 				self.render();
 				self.openColorDialog( id );
 			} );
 
 			this.$el.on( 'click', '.fmm-folder-up, .fmm-folder-down', function() {
-				self.move( String( $( this ).closest( 'li' ).data( 'folder' ) ), $( this ).hasClass( 'fmm-folder-up' ) ? -1 : 1 );
+				self.move( rowValue( this ), $( this ).hasClass( 'fmm-folder-up' ) ? -1 : 1 );
 			} );
 
 			this.$el.on( 'keydown', '.fmm-sidebar__item', function( event ) {
-				var id = String( $( this ).data( 'folder' ) );
+				var id = rowValue( this );
 				var $items, index;
 
 				if ( self.menuOpen !== id || ! $( event.target ).closest( '.fmm-menu, .fmm-folder-menu-toggle' ).length ) {
@@ -535,7 +699,7 @@
 			} );
 
 			this.$el.on( 'focusout', '.fmm-sidebar__item', function() {
-				var id = String( $( this ).data( 'folder' ) );
+				var id = rowValue( this );
 
 				setTimeout( function() {
 					var active = document.activeElement;
@@ -548,6 +712,59 @@
 				}, 0 );
 			} );
 
+			/*
+			 * Lazy row actions: rows under the pointer or holding the focus get
+			 * their buttons (and lose them again); see needsActions().
+			 */
+			this.$el.on( 'mouseover', function( event ) {
+				var li = self.lazy ? event.target.closest( '.fmm-sidebar__item--folder' ) : null;
+				self.setHover( li ? li.getAttribute( 'data-folder' ) : null );
+			} );
+
+			this.$el.on( 'mouseleave', function() {
+				self.setHover( null );
+			} );
+
+			this.$el.on( 'focusin', function( event ) {
+				self.setFocusRow( self.focusRowOf( event.target ) );
+			} );
+
+			this.$el.on( 'focusout', function() {
+				setTimeout( function() {
+					var active = document.activeElement;
+					self.setFocusRow( active && self.$el[ 0 ].contains( active ) ? self.focusRowOf( active ) : null );
+				}, 0 );
+			} );
+
+			// Shift+Tab out of a row lands on the previous row's menu button: create it before the browser moves focus.
+			this.$el.on( 'keydown', '.fmm-sidebar__item--folder', function( event ) {
+				var first = this.querySelector( '.fmm-folder-toggle:not(:disabled)' ) || this.querySelector( '.fmm-folder' );
+				var prev = this.previousElementSibling;
+
+				if ( 'Tab' !== event.key || ! event.shiftKey || ! self.lazy || event.target !== first || ! prev || ! prev.classList.contains( 'fmm-sidebar__item--folder' ) ) {
+					return;
+				}
+				self.prepare( prev.getAttribute( 'data-folder' ) );
+			} );
+
+			if ( this.mq ) {
+				this.mq[ this.mq.addEventListener ? 'addEventListener' : 'addListener' ]( 'change', function() {
+					self.updateLazy( true );
+				} );
+			}
+
+			// The first mouse or pen movement enables lazy actions; existing buttons stay until the next render.
+			moveEvent = window.PointerEvent ? 'pointermove' : 'mousemove';
+			onMove = function( event ) {
+				if ( 'touch' === event.pointerType ) {
+					return;
+				}
+				document.removeEventListener( moveEvent, onMove );
+				self.pointerSeen = true;
+				self.updateLazy( false );
+			};
+			document.addEventListener( moveEvent, onMove, { passive: true } );
+
 			$( document ).on( 'click', function( event ) {
 				if ( self.menuOpen && ! $( event.target ).closest( '.fmm-menu, .fmm-folder-menu-toggle' ).length ) {
 					self.closeMenu();
@@ -555,17 +772,17 @@
 			} );
 
 			this.$el.on( 'click', '.fmm-folder-rename', function() {
-				self.startEdit( String( $( this ).closest( 'li' ).data( 'folder' ) ) );
+				self.startEdit( rowValue( this ) );
 			} );
 
 			this.$el.on( 'click', '.fmm-folder-delete', function() {
-				self.remove( String( $( this ).closest( 'li' ).data( 'folder' ) ) );
+				self.remove( rowValue( this ) );
 			} );
 
 			this.$el.on( 'click', '.fmm-folder-add, .fmm-folder-remove, .fmm-folder-move', function() {
 				var $button = $( this );
 				var mode = $button.hasClass( 'fmm-folder-move' ) ? 'move' : 'add';
-				self.assign( self.selectedIds(), $button.closest( 'li' ).data( 'folder' ), $button.hasClass( 'fmm-folder-remove' ) ? 'remove' : mode );
+				self.assign( self.selectedIds(), rowValue( this ), $button.hasClass( 'fmm-folder-remove' ) ? 'remove' : mode );
 			} );
 
 			this.$el.on( 'click', '.notice-dismiss', function() {
@@ -613,6 +830,7 @@
 					return;
 				}
 
+				self.flushSearch();
 				self.dragIds = ids;
 				dt.effectAllowed = 'copyMove';
 				dt.setData( DRAG_TYPE, JSON.stringify( ids ) );
@@ -640,7 +858,7 @@
 				row = $( event.target ).closest( '.fmm-sidebar__item--droppable' );
 				if ( row.length ) {
 					event.preventDefault();
-					event.dataTransfer.dropEffect = 'move' === self.dropMode( event, row.data( 'folder' ) ) ? 'move' : 'copy';
+					event.dataTransfer.dropEffect = 'move' === self.dropMode( event, rowValue( row ) ) ? 'move' : 'copy';
 				}
 				self.highlight( row );
 			}
@@ -660,18 +878,19 @@
 				row = $( event.target ).closest( '.fmm-sidebar__item--droppable' );
 				self.endDrag();
 				if ( row.length ) {
-					self.assign( ids, row.data( 'folder' ), self.dropMode( event, row.data( 'folder' ) ) );
+					self.assign( ids, rowValue( row ), self.dropMode( event, rowValue( row ) ) );
 				}
 			}
 
 			this.$el.on( 'dragstart', '.fmm-folder[draggable="true"]', function( event ) {
 				var dt = event.originalEvent && event.originalEvent.dataTransfer;
-				var id = String( $( this ).closest( 'li' ).data( 'folder' ) );
+				var id = rowValue( this );
 
 				if ( ! dt ) {
 					return;
 				}
 
+				self.flushSearch();
 				self.dragFolder = id;
 				dt.effectAllowed = 'move';
 				dt.setData( FOLDER_DRAG_TYPE, id );
@@ -737,7 +956,7 @@
 				return null;
 			}
 
-			target = this.node( $row.data( 'folder' ) );
+			target = this.node( rowValue( $row ) );
 			if ( ! target || String( target.folder.id ) === this.dragFolder ) {
 				return null;
 			}
@@ -1175,6 +1394,24 @@
 		},
 
 		/**
+		 * Per-render state shared by all rows.
+		 *
+		 * @return {Object} { current, selected, source, sourceName, counts }.
+		 */
+		context: function() {
+			var selected = this.selection ? this.selection.length : 0;
+			var source = this.currentFolder();
+
+			return {
+				current: this.current(),
+				selected: selected,
+				source: source,
+				sourceName: source ? store.get( source ).name : '',
+				counts: selected ? this.selectedCounts() : null
+			};
+		},
+
+		/**
 		 * One list row.
 		 *
 		 * @param {string}  value    Filter value ('' = all, 'none', or ID).
@@ -1182,88 +1419,237 @@
 		 * @param {number}  count    Media count.
 		 * @param {string}  iconName Icon name.
 		 * @param {boolean} isFolder Whether this is a real folder.
+		 * @param {Object}  ctx      See context().
 		 * @param {Object}  [node]   Tree node from store.tree().
-		 * @return {jQuery} Row.
+		 * @return {Element} Row.
 		 */
-		row: function( value, name, count, iconName, isFolder, node ) {
-			var selected = this.selectedIds().length;
-			var source = this.currentFolder();
-			var $li = $( '<li class="fmm-sidebar__item"></li>' ).attr( 'data-folder', value );
-			var inFolder, $actions, $folder;
+		row: function( value, name, count, iconName, isFolder, ctx, node ) {
+			var li = templates().li.cloneNode( false );
+			var active = value === ctx.current;
+			var folder, countEl;
+
+			li.setAttribute( 'data-folder', value );
+			if ( active ) {
+				li.classList.add( 'is-active' );
+			}
 
 			if ( node && node.depth ) {
-				$li[ 0 ].style.setProperty( '--fmm-depth', node.depth );
+				li.style.setProperty( '--fmm-depth', node.depth );
 			}
 
 			if ( isFolder && String( this.editing ) === value ) {
-				return $li.append( this.form( name ) );
+				li.appendChild( this.form( name )[ 0 ] );
+				return li;
 			}
 
-			// Chevron column (only while any folder has subfolders); leaves keep the space.
+			// Chevron column (only while any folder has subfolders); leaves are padded to match in CSS.
 			if ( this.hasTree ) {
-				$li.append( node && node.hasChildren ? this.toggleButton( node.folder ) : '<span class="fmm-folder-toggle fmm-folder-toggle--empty" aria-hidden="true"></span>' );
+				if ( node && node.hasChildren ) {
+					li.appendChild( this.toggleButton( node.folder ) );
+				} else {
+					li.classList.add( 'fmm-sidebar__item--leaf' );
+				}
 			}
 
-			$folder = $( '<button type="button" class="fmm-folder"></button>' ).attr( 'data-fmm-key', 'folder-' + value ).append(
-					icon( isFolder && 'folder' === iconName && String( value ) === this.current() ? 'folder-open' : iconName ),
-					this.nameElement( name, isFolder ),
-					$( '<span class="fmm-folder__count"></span>' ).text( count )
-						/* translators: %d: number of media items. */
-						.attr( 'aria-label', sprintf( _n( '%d item', '%d items', count, 'fena-media-manager' ), count ) )
-			);
-			if ( isFolder && store.canManage && ! selected && null === this.editing && ! this.query ) {
-				$folder.attr( 'draggable', 'true' );
+			folder = templates().folder.cloneNode( true );
+			folder.insertBefore( iconEl( iconName ), folder.firstChild );
+			if ( active && isFolder && 'folder' === iconName ) {
+				folder.firstChild.firstChild.setAttribute( 'href', '#fmm-i-folder-open' );
+			}
+			folder.setAttribute( 'data-fmm-key', 'folder-' + value );
+			this.fillName( folder.childNodes[ 1 ], name, isFolder );
+			countEl = folder.lastChild;
+			countEl.textContent = count;
+			countEl.setAttribute( 'aria-label', countLabel( count ) );
+			if ( active ) {
+				folder.setAttribute( 'aria-current', 'true' );
+			}
+			if ( isFolder && this.canDrag( ctx ) ) {
+				folder.setAttribute( 'draggable', 'true' );
 			}
 			if ( node && _.contains( COLOR_PRESETS, node.folder.color ) ) {
-				$folder.attr( 'data-fmm-color', node.folder.color );
+				folder.setAttribute( 'data-fmm-color', node.folder.color );
 			} else if ( node && COLOR_HEX.test( node.folder.color || '' ) ) {
-				$folder[ 0 ].style.setProperty( '--fmm-folder-color', node.folder.color );
+				folder.style.setProperty( '--fmm-folder-color', node.folder.color );
 			}
-			$li.append( $folder );
+			li.appendChild( folder );
 
-			if ( ! isFolder ) {
-				return $li;
+			if ( isFolder ) {
+				li.classList.add( 'fmm-sidebar__item--folder', 'fmm-sidebar__item--droppable' );
+				this.fillTrailing( li, value, name, ctx );
 			}
 
-			$li.addClass( 'fmm-sidebar__item--folder fmm-sidebar__item--droppable' );
+			return li;
+		},
 
-			if ( selected ) {
+		canDrag: function( ctx ) {
+			return store.canManage && ! ctx.selected && null === this.editing && ! this.query;
+		},
+
+		/**
+		 * Trailing part of a folder row: the assign buttons while media is
+		 * selected, otherwise the row actions (and the open menu).
+		 *
+		 * @param {Element} li    Row.
+		 * @param {string}  value Folder ID.
+		 * @param {string}  name  Folder name.
+		 * @param {Object}  ctx   See context().
+		 */
+		fillTrailing: function( li, value, name, ctx ) {
+			var inFolder, actions;
+
+			if ( ctx.selected ) {
 				// Assign the selection: "+" when some selected items are not in the folder, "−" when some are.
-				inFolder = this.selectedInFolder( value );
-				$actions = $( '<span class="fmm-folder__assign"></span>' );
-				if ( inFolder < selected ) {
-					$actions.append( this.actionButton( 'fmm-folder-add', 'folder-plus', 'add-' + value,
-						/* translators: 1: number of media files, 2: folder name. */
-						sprintf( _n( 'Add %1$d selected media file to “%2$s”', 'Add %1$d selected media files to “%2$s”', selected, 'fena-media-manager' ), selected, name ) ) );
+				inFolder = ctx.counts[ String( Number( value ) ) ] || 0;
+				actions = templates().assign.cloneNode( false );
+				if ( inFolder < ctx.selected ) {
+					actions.appendChild( this.actionButton( 'fmm-folder-add', 'folder-plus', 'add-' + value, addLabel( ctx, name ) ) );
 				}
 				// "→" moves the selection out of the active folder into this one.
-				if ( source && source !== value ) {
-					$actions.append( this.actionButton( 'fmm-folder-move', 'folder-move', 'move-' + value,
-						/* translators: 1: number of media files, 2: source folder name, 3: target folder name. */
-						sprintf( _n( 'Move %1$d selected media file from “%2$s” to “%3$s”', 'Move %1$d selected media files from “%2$s” to “%3$s”', selected, 'fena-media-manager' ), selected, store.get( source ).name, name ) ) );
+				if ( ctx.source && ctx.source !== value ) {
+					actions.appendChild( this.actionButton( 'fmm-folder-move', 'folder-move', 'move-' + value, moveLabel( ctx, name ) ) );
 				}
 				if ( inFolder > 0 ) {
-					$actions.append( this.actionButton( 'fmm-folder-remove', 'folder-minus', 'remove-' + value,
-						/* translators: 1: number of media files, 2: folder name. */
-						sprintf( _n( 'Remove %1$d selected media file from “%2$s”', 'Remove %1$d selected media files from “%2$s”', inFolder, 'fena-media-manager' ), inFolder, name ) ) );
+					actions.appendChild( this.actionButton( 'fmm-folder-remove', 'folder-minus', 'remove-' + value, removeLabel( inFolder, name ) ) );
 				}
-				return $li.addClass( 'has-assign' ).append( $actions );
+				li.classList.add( 'has-assign' );
+				li.appendChild( actions );
+				return;
 			}
 
 			if ( store.canManage ) {
-				$li.append(
-					$( '<span class="fmm-folder__actions"></span>' ).append(
-						/* translators: %s: folder name. */
-						this.actionButton( 'fmm-folder-subfolder', 'subfolder', 'subfolder-' + value, sprintf( __( 'New subfolder in “%s”', 'fena-media-manager' ), name ) ),
-						this.menuToggle( value, name )
-					)
-				);
+				if ( this.needsActions( value ) ) {
+					li.appendChild( this.buildActions( value, name ) );
+				}
 				if ( this.menuOpen === value ) {
-					$li.addClass( 'is-menu-open' ).append( this.menu( value ) );
+					li.classList.add( 'is-menu-open' );
+					li.appendChild( this.menu( value )[ 0 ] );
 				}
 			}
+		},
 
-			return $li;
+		/**
+		 * Lazy row actions need a manager on a hover-capable desktop after a real pointer has been used.
+		 *
+		 * @return {boolean} Whether lazy mode applies.
+		 */
+		lazyWanted: function() {
+			return !! ( store.canManage && this.mq && this.mq.matches && this.pointerSeen );
+		},
+
+		/**
+		 * Recomputes lazy mode (media query change, first pointer movement).
+		 *
+		 * @param {boolean} rerender Whether to render when it changed.
+		 */
+		updateLazy: function( rerender ) {
+			var lazy = this.lazyWanted();
+
+			if ( lazy !== this.lazy ) {
+				this.lazy = lazy;
+				this.hoverId = null;
+				this.focusRowId = this.focusRowOf( document.activeElement );
+				if ( rerender ) {
+					this.render();
+				}
+			}
+		},
+
+		/**
+		 * Whether a folder row has its subfolder and menu buttons. Always, except
+		 * in lazy mode (after a real pointer has been used) where only the row that
+		 * is hovered, focused, has its menu open, is about to receive focus, or is the last one does.
+		 *
+		 * @param {string} id Folder ID.
+		 * @return {boolean} Whether the actions exist.
+		 */
+		needsActions: function( id ) {
+			return ! this.lazy || id === this.menuOpen || id === this.hoverId || id === this.focusRowId || id === this.prepId || id === this.lastFolderId;
+		},
+
+		buildActions: function( value, name ) {
+			var actions = templates().actions.cloneNode( false );
+
+			actions.appendChild( this.actionButton( 'fmm-folder-subfolder', 'subfolder', 'subfolder-' + value, sprintf( strings().subfolder, name ) ) );
+			actions.appendChild( this.menuToggle( value, name ) );
+
+			return actions;
+		},
+
+		/**
+		 * Adds or removes the actions of one rendered folder row to match needsActions().
+		 *
+		 * @param {string|null} id Folder ID.
+		 */
+		syncActions: function( id ) {
+			var li, folder, actions;
+
+			if ( ! id || ! this.lazy || ( this.selection && this.selection.length ) ) {
+				return;
+			}
+
+			li = this.rowOf( id );
+			folder = li && store.get( id );
+			if ( ! folder || ! li.classList.contains( 'fmm-sidebar__item--folder' ) || ! li.querySelector( '.fmm-folder' ) ) {
+				return;
+			}
+
+			actions = li.querySelector( ':scope > .fmm-folder__actions' );
+			if ( this.needsActions( id ) ) {
+				if ( ! actions ) {
+					li.appendChild( this.buildActions( id, folder.name ) );
+				}
+			} else if ( actions && ! li.contains( document.activeElement ) && ! li.classList.contains( 'is-menu-open' ) ) {
+				li.removeChild( actions );
+			}
+		},
+
+		setHover: function( id ) {
+			var old = this.hoverId;
+
+			if ( id !== old ) {
+				this.hoverId = id;
+				this.syncActions( old );
+				this.syncActions( id );
+			}
+		},
+
+		focusRowOf: function( el ) {
+			var li = el && el.closest ? el.closest( '.fmm-sidebar__item--folder' ) : null;
+			return li && this.$el[ 0 ].contains( li ) ? li.getAttribute( 'data-folder' ) : null;
+		},
+
+		setFocusRow: function( id ) {
+			var old = this.focusRowId;
+			var prep = this.prepId;
+
+			if ( id !== old ) {
+				this.focusRowId = id;
+				this.syncActions( old );
+				this.syncActions( id );
+			}
+			if ( prep ) {
+				this.prepId = null;
+				this.syncActions( prep );
+			}
+		},
+
+		/**
+		 * Makes sure a row has its actions before focus moves into it; released once focus settles.
+		 *
+		 * @param {string} id Folder ID.
+		 */
+		prepare: function( id ) {
+			var self = this;
+
+			this.prepId = id;
+			this.syncActions( id );
+			setTimeout( function() {
+				if ( self.prepId === id ) {
+					self.prepId = null;
+					self.syncActions( id );
+				}
+			}, 0 );
 		},
 
 		/**
@@ -1271,15 +1657,18 @@
 		 *
 		 * @param {string} id   Folder ID.
 		 * @param {string} name Folder name.
-		 * @return {jQuery} Button.
+		 * @return {Element} Button.
 		 */
 		menuToggle: function( id, name ) {
 			var open = this.menuOpen === id;
-			/* translators: %s: folder name. */
-			var label = sprintf( __( 'More actions for “%s”', 'fena-media-manager' ), name );
+			var button = this.actionButton( 'fmm-folder-menu-toggle', 'more', 'menu-' + id, sprintf( strings().more, name ) );
 
-			return this.actionButton( 'fmm-folder-menu-toggle', 'more', 'menu-' + id, label )
-				.attr( { 'aria-expanded': String( open ), 'aria-controls': open ? 'fmm-folder-menu-' + id : null } );
+			button.setAttribute( 'aria-expanded', String( open ) );
+			if ( open ) {
+				button.setAttribute( 'aria-controls', 'fmm-folder-menu-' + id );
+			}
+
+			return button;
 		},
 
 		/**
@@ -1320,20 +1709,21 @@
 		 * Expand/collapse button of a folder with subfolders.
 		 *
 		 * @param {Object} folder Folder.
-		 * @return {jQuery} Button.
+		 * @return {Element} Button.
 		 */
 		toggleButton: function( folder ) {
 			var expanded = !! this.query || !! this.expanded[ String( folder.id ) ];
-			var label = expanded ?
-				/* translators: %s: folder name. */
-				sprintf( __( 'Hide subfolders of “%s”', 'fena-media-manager' ), folder.name ) :
-				/* translators: %s: folder name. */
-				sprintf( __( 'Show subfolders of “%s”', 'fena-media-manager' ), folder.name );
+			var label = sprintf( expanded ? strings().hide : strings().show, folder.name );
+			var button = templates().toggle.cloneNode( false );
 
-			return $( '<button type="button" class="fmm-folder-toggle"></button>' )
-				.attr( { 'aria-expanded': String( expanded ), 'aria-label': label, title: label, 'data-fmm-key': 'toggle-' + folder.id } )
-				.prop( 'disabled', !! this.query )
-				.append( icon( expanded ? 'expanded' : 'collapsed' ) );
+			button.setAttribute( 'aria-expanded', String( expanded ) );
+			button.setAttribute( 'aria-label', label );
+			button.setAttribute( 'title', label );
+			button.setAttribute( 'data-fmm-key', 'toggle-' + folder.id );
+			button.disabled = !! this.query;
+			button.appendChild( iconEl( expanded ? 'expanded' : 'collapsed' ) );
+
+			return button;
 		},
 
 		toggleFolder: function( id ) {
@@ -1342,10 +1732,18 @@
 		},
 
 		actionButton: function( className, iconName, key, label ) {
-			return $( '<button type="button" class="button-link"></button>' )
-				.addClass( className )
-				.attr( { 'data-fmm-key': key, 'aria-label': label, title: label } )
-				.append( icon( iconName ) );
+			var id = className + ' ' + iconName;
+			var button = ( actionTpl[ id ] || ( actionTpl[ id ] = ( function() {
+				var node = tag( 'button', 'button-link ' + className, 'button' );
+				node.appendChild( iconEl( iconName ) );
+				return node;
+			}() ) ) ).cloneNode( true );
+
+			button.setAttribute( 'data-fmm-key', key );
+			button.setAttribute( 'aria-label', label );
+			button.setAttribute( 'title', label );
+
+			return button;
 		},
 
 		form: function( value ) {
@@ -1363,6 +1761,7 @@
 
 		render: function() {
 			var self = this;
+			var focusKey, ctx, tree, visible, frag, shown, hadSearch;
 
 			// Drags keep the DOM they started on; endDrag() renders afterwards.
 			if ( this.dragIds || this.dragFolder ) {
@@ -1370,13 +1769,15 @@
 				return;
 			}
 			this.renderPending = false;
-			var $list = this.$el.find( '.fmm-sidebar__list' );
-			var focusKey = $( document.activeElement ).closest( this.$el ).length ? $( document.activeElement ).attr( 'data-fmm-key' ) : null;
-			var selected = this.selectedIds().length;
-			var tree = store.tree();
-			var visible = this.query ? this.searchVisible( tree ) : null;
+			hadSearch = !! this.searchTimer;
+			clearTimeout( this.searchTimer );
+			this.searchTimer = 0;
+			focusKey = this.focusedKey();
+			ctx = this.context();
+			tree = store.tree();
+			visible = this.query ? this.searchVisible( tree ) : null;
 
-			if ( this.menuOpen && ( selected || null !== this.editing || ! store.get( this.menuOpen ) || ( visible && ! visible[ this.menuOpen ] ) ) ) {
+			if ( this.menuOpen && ( ctx.selected || null !== this.editing || ! store.get( this.menuOpen ) || ( visible && ! visible[ this.menuOpen ] ) ) ) {
 				this.menuOpen = null;
 			}
 
@@ -1385,46 +1786,46 @@
 			} );
 			this.$el.toggleClass( 'has-tree', this.hasTree );
 
-			$list.empty();
-			$list.append( this.row( '', __( 'All Media', 'fena-media-manager' ), store.total, 'all', false ) );
-			$list.append( this.row( 'none', __( 'Unassigned', 'fena-media-manager' ), store.unassigned, 'unassigned', false ) );
+			frag = document.createDocumentFragment();
+			frag.appendChild( this.row( '', __( 'All Media', 'fena-media-manager' ), store.total, 'all', false, ctx ) );
+			frag.appendChild( this.row( 'none', __( 'Unassigned', 'fena-media-manager' ), store.unassigned, 'unassigned', false, ctx ) );
 
 			if ( 'new' === this.editing && ! this.newParent ) {
-				$list.append( $( '<li class="fmm-sidebar__item fmm-sidebar__item--new"></li>' ).append( this.form( '' ) ) );
+				frag.appendChild( $( '<li class="fmm-sidebar__item fmm-sidebar__item--new"></li>' ).append( this.form( '' ) )[ 0 ] );
 			}
 
 			if ( visible && ! this.matchCount ) {
-				$list.append( $( '<li class="fmm-sidebar__item fmm-sidebar__empty"></li>' ).text( __( 'No folders found.', 'fena-media-manager' ) ) );
+				frag.appendChild( $( '<li class="fmm-sidebar__item fmm-sidebar__empty"></li>' ).text( __( 'No folders found.', 'fena-media-manager' ) )[ 0 ] );
 			}
 
 			// Rows below a collapsed folder are not rendered; the folder filter is unaffected.
 			// While searching, matches and their ancestors are shown regardless of this.expanded.
-			_.each( tree, function( node ) {
+			shown = _.filter( tree, function( node ) {
+				return visible ? visible[ String( node.folder.id ) ] : ! _.some( node.parents, function( parent ) {
+					return ! self.expanded[ parent ];
+				} );
+			} );
+			this.lastFolderId = shown.length ? String( shown[ shown.length - 1 ].folder.id ) : null;
+
+			_.each( shown, function( node ) {
 				var id = String( node.folder.id );
 				var $new;
 
-				if ( visible ? ! visible[ id ] : _.some( node.parents, function( parent ) {
-					return ! self.expanded[ parent ];
-				} ) ) {
-					return;
-				}
-
-				$list.append( self.row( id, node.folder.name, node.folder.count, 'folder', true, node ) );
+				frag.appendChild( self.row( id, node.folder.name, node.folder.count, 'folder', true, ctx, node ) );
 
 				if ( 'new' === self.editing && self.newParent === id ) {
 					$new = $( '<li class="fmm-sidebar__item fmm-sidebar__item--new"></li>' ).append( self.form( '' ) );
 					$new[ 0 ].style.setProperty( '--fmm-depth', node.depth + 1 );
-					$list.append( $new );
+					frag.appendChild( $new[ 0 ] );
 				}
 			} );
 
+			// Native clearing: rows carry no jQuery data (see rowValue()).
+			this.list.textContent = '';
+			this.list.appendChild( frag );
+
 			this.$el.find( '.fmm-sort__select' ).val( store.sort );
-			this.$el.toggleClass( 'has-selection', selected > 0 );
-			this.$el.find( '.fmm-sidebar__selection' ).prop( 'hidden', ! selected ).text( ! selected ? '' : ( this.currentFolder() ?
-				/* translators: %d: number of selected media files. */
-				sprintf( _n( '%d media file selected. Use +, → or − next to a folder, or drag the selection onto a folder to move it (hold Ctrl/⌘ to add it instead).', '%d media files selected. Use +, → or − next to a folder, or drag the selection onto a folder to move it (hold Ctrl/⌘ to add it instead).', selected, 'fena-media-manager' ), selected ) :
-				/* translators: %d: number of selected media files. */
-				sprintf( _n( '%d media file selected. Use + or − next to a folder, or drag the selection onto a folder.', '%d media files selected. Use + or − next to a folder, or drag the selection onto a folder.', selected, 'fena-media-manager' ), selected ) ) );
+			this.renderSelectionUi( ctx.selected );
 
 			// The active folder was deleted elsewhere: fall back to all media.
 			if ( this.current() && 'none' !== this.current() && ! store.get( this.current() ) ) {
@@ -1438,6 +1839,43 @@
 			} else if ( focusKey ) {
 				this.focusKey( focusKey );
 			}
+
+			if ( hadSearch ) {
+				this.announceSearch( false );
+			}
+		},
+
+		/**
+		 * data-fmm-key of the focused element inside the sidebar, if any.
+		 *
+		 * @return {string|null} Key.
+		 */
+		focusedKey: function() {
+			return $( document.activeElement ).closest( this.$el ).length ? $( document.activeElement ).attr( 'data-fmm-key' ) : null;
+		},
+
+		/**
+		 * Selection hint and has-selection class.
+		 *
+		 * @param {number} selected Number of selected media files.
+		 */
+		renderSelectionUi: function( selected ) {
+			this.$el.toggleClass( 'has-selection', selected > 0 );
+			this.$el.find( '.fmm-sidebar__selection' ).prop( 'hidden', ! selected ).text( ! selected ? '' : ( this.currentFolder() ?
+				/* translators: %d: number of selected media files. */
+				sprintf( _n( '%d media file selected. Use +, → or − next to a folder, or drag the selection onto a folder to move it (hold Ctrl/⌘ to add it instead).', '%d media files selected. Use +, → or − next to a folder, or drag the selection onto a folder to move it (hold Ctrl/⌘ to add it instead).', selected, 'fena-media-manager' ), selected ) :
+				/* translators: %d: number of selected media files. */
+				sprintf( _n( '%d media file selected. Use + or − next to a folder, or drag the selection onto a folder.', '%d media files selected. Use + or − next to a folder, or drag the selection onto a folder.', selected, 'fena-media-manager' ), selected ) ) );
+		},
+
+		/**
+		 * The row element of a filter value, if rendered.
+		 *
+		 * @param {string} value '' = all, 'none', or a folder ID.
+		 * @return {Element|null} Row.
+		 */
+		rowOf: function( value ) {
+			return this.list.querySelector( '[data-folder="' + String( value ).replace( /["\\]/g, '\\$&' ) + '"]' );
 		},
 
 		/**
@@ -1465,23 +1903,132 @@
 		},
 
 		renderActive: function() {
+			this.activeRow = this.rowOf( this.current() );
+		},
+
+		/**
+		 * Marks a row as (in)active: class, aria-current and the open/closed folder icon.
+		 *
+		 * @param {Element|null} li     Row.
+		 * @param {boolean}      active Whether it is the active folder.
+		 */
+		setActive: function( li, active ) {
+			var button, use, href;
+
+			if ( ! li ) {
+				return;
+			}
+
+			li.classList.toggle( 'is-active', active );
+			button = li.querySelector( '.fmm-folder' );
+			if ( ! button ) {
+				return;
+			}
+			if ( active ) {
+				button.setAttribute( 'aria-current', 'true' );
+			} else {
+				button.removeAttribute( 'aria-current' );
+			}
+			if ( li.classList.contains( 'fmm-sidebar__item--folder' ) ) {
+				use = button.querySelector( 'use' );
+				href = '#fmm-i-' + ( active ? 'folder-open' : 'folder' );
+				if ( use && use.getAttribute( 'href' ) !== href ) {
+					use.setAttribute( 'href', href );
+				}
+			}
+		},
+
+		/**
+		 * The active folder changed: updates only the two rows involved. The
+		 * selection hint and the "→" buttons depend on the active folder, and
+		 * menus and forms on the rows, so those cases render in full.
+		 */
+		folderChanged: function() {
 			var current = this.current();
+			var next;
 
-			this.$el.find( '.fmm-sidebar__item' ).each( function() {
-				var $item = $( this );
-				var active = String( $item.data( 'folder' ) ) === current;
-				$item.toggleClass( 'is-active', active );
-				$item.find( '.fmm-folder' ).attr( 'aria-current', active ? 'true' : null );
+			if ( this.dragIds || this.dragFolder || ( this.selection && this.selection.length ) || null !== this.editing || this.menuOpen || ( /^\d+$/.test( current ) && ! store.get( current ) ) ) {
+				this.render();
+				return;
+			}
 
-				if ( $item.hasClass( 'fmm-sidebar__item--folder' ) ) {
-					var use = $item.find( '.fmm-folder .fmm-icon use' )[ 0 ];
-					var href = '#fmm-i-' + ( active ? 'folder-open' : 'folder' );
+			next = this.rowOf( current );
+			if ( next !== this.activeRow ) {
+				this.setActive( this.activeRow, false );
+				this.setActive( next, true );
+				this.activeRow = next;
+			}
+		},
 
-					if ( use && use.getAttribute( 'href' ) !== href ) {
-						use.setAttribute( 'href', href );
+		/*
+		 * Selection events come in bursts (select all, shift-click ranges):
+		 * one update per animation frame instead of one per event.
+		 */
+		queueSelection: function() {
+			var self = this;
+
+			if ( this.dragIds || this.dragFolder ) {
+				this.renderPending = true;
+				return;
+			}
+			if ( ! this.selectionFrame ) {
+				this.selectionFrame = window.requestAnimationFrame( function() {
+					self.selectionFrame = 0;
+					self.updateSelection();
+				} );
+			}
+		},
+
+		/**
+		 * Applies a selection change without rebuilding the list: replaces the
+		 * trailing buttons of every rendered folder row. Produces the same DOM as render().
+		 */
+		updateSelection: function() {
+			var self = this;
+			var active = document.activeElement;
+			var focusKey, ctx;
+
+			if ( this.dragIds || this.dragFolder ) {
+				this.renderPending = true;
+				return;
+			}
+
+			focusKey = this.focusedKey();
+			ctx = this.context();
+			if ( this.menuOpen && ( ctx.selected || null !== this.editing ) ) {
+				this.menuOpen = null;
+			}
+
+			Array.prototype.forEach.call( this.list.querySelectorAll( '.fmm-sidebar__item--folder' ), function( li ) {
+				var value = li.getAttribute( 'data-folder' );
+				var folder = store.get( value );
+				var button = li.querySelector( '.fmm-folder' );
+				var i, child;
+
+				if ( ! folder || ! button ) {
+					return;
+				}
+
+				for ( i = li.children.length - 1; i >= 0; i-- ) {
+					child = li.children[ i ];
+					if ( child.classList.contains( 'fmm-folder__assign' ) || child.classList.contains( 'fmm-folder__actions' ) || child.classList.contains( 'fmm-menu' ) ) {
+						li.removeChild( child );
 					}
 				}
+				li.classList.remove( 'has-assign', 'is-menu-open' );
+				if ( self.canDrag( ctx ) ) {
+					button.setAttribute( 'draggable', 'true' );
+				} else {
+					button.removeAttribute( 'draggable' );
+				}
+				self.fillTrailing( li, value, folder.name, ctx );
 			} );
+
+			this.renderSelectionUi( ctx.selected );
+
+			if ( focusKey && ! document.contains( active ) ) {
+				this.focusKey( focusKey );
+			}
 		},
 
 		/**
@@ -1491,6 +2038,12 @@
 		 */
 		focusKey: function( key ) {
 			var $target = this.$el.find( '[data-fmm-key="' + key + '"]' );
+			var action = /^(?:menu|subfolder|up|down)-(.+)$/.exec( key );
+
+			if ( ! $target.length && action ) {
+				this.prepare( action[ 1 ] );
+				$target = this.$el.find( '[data-fmm-key="' + key + '"]' );
+			}
 			if ( ! $target.length ) {
 				$target = this.$el.find( '[data-fmm-key="folder-' + String( key ).replace( /^[a-z]+-/, '' ) + '"]' );
 			}

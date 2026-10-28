@@ -45,27 +45,64 @@
 			if ( summary.sort ) {
 				this.sort = summary.sort;
 			}
+			this.index = this.cachedTree = this.nodes = null;
 			this.trigger( 'change' );
 		},
 
+		/**
+		 * Folder by ID (lazily built index, valid until the next set()).
+		 *
+		 * @param {string|number} id Folder ID.
+		 * @return {Object|undefined} Folder.
+		 */
 		get: function( id ) {
-			return _.find( this.folders, function( folder ) {
-				return String( folder.id ) === String( id );
-			} );
+			var index = this.index;
+
+			if ( ! index ) {
+				index = this.index = {};
+				_.each( this.folders, function( folder ) {
+					var key = String( folder.id );
+					if ( ! index[ key ] ) {
+						index[ key ] = folder;
+					}
+				} );
+			}
+
+			return index[ String( id ) ];
+		},
+
+		/**
+		 * Tree node by folder ID (see tree()).
+		 *
+		 * @param {string|number} id Folder ID.
+		 * @return {Object|undefined} Node.
+		 */
+		node: function( id ) {
+			this.tree();
+			return this.nodes[ String( id ) ];
 		},
 
 		/**
 		 * Folders in tree order (depth first, siblings in the user's sort mode,
 		 * as sorted by the server; never re-sorted here). Folders whose parent is missing are shown at the top level.
 		 *
+		 * The result is memoized until the next set(): callers must not modify it.
+		 *
 		 * @return {Object[]} { folder, depth, parents: [ids], hasChildren }.
 		 */
 		tree: function() {
 			var self = this;
-			var children = _.groupBy( this.folders, function( folder ) {
+			var nodes = {};
+			var children, list;
+
+			if ( this.cachedTree ) {
+				return this.cachedTree;
+			}
+
+			children = _.groupBy( this.folders, function( folder ) {
 				return folder.parent && self.get( folder.parent ) ? String( folder.parent ) : '0';
 			} );
-			var list = [];
+			list = [];
 
 			( function walk( parentId, depth, parents ) {
 				_.each( children[ parentId ] || [], function( folder ) {
@@ -75,9 +112,15 @@
 						return;
 					}
 					list.push( { folder: folder, depth: depth, parents: parents, hasChildren: !! children[ id ] } );
+					if ( ! nodes[ id ] ) {
+						nodes[ id ] = list[ list.length - 1 ];
+					}
 					walk( id, depth + 1, parents.concat( id ) );
 				} );
 			}( '0', 0, [] ) );
+
+			this.nodes = nodes;
+			this.cachedTree = list;
 
 			return list;
 		},
