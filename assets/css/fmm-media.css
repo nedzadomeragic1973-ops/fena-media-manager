@@ -6,15 +6,15 @@
 
 /* Plugin buttons (core button classes, scoped by plugin class) */
 .fmm-form .button.fmm-form-cancel {
-	color: var(--fmm-primary);
+	color: var(--fmm-text-body);
 	background: var(--fmm-surface);
-	border-color: var(--fmm-primary);
+	border-color: var(--fmm-border);
 }
 
 .fmm-form .button.fmm-form-cancel:hover {
-	color: var(--fmm-primary-hover);
-	background: var(--fmm-surface-muted);
-	border-color: var(--fmm-primary-hover);
+	color: var(--fmm-text);
+	background: var(--fmm-surface-subtle);
+	border-color: var(--fmm-border-strong);
 }
 
 .fmm-form .button.button-primary {
@@ -335,7 +335,8 @@
 
 .fmm-sidebar__list {
 	margin: 8px 0 0;
-	padding: 0;
+	padding-block: 0;
+	padding-inline: 8px;
 	list-style: none;
 }
 
@@ -343,28 +344,28 @@
 	position: relative;
 	display: flex;
 	align-items: center;
-	margin: 0;
-	border-left: 3px solid transparent;
+	margin: 1px 0;
+	border-radius: var(--fmm-radius-control);
+	transition: background-color var(--fmm-transition);
 }
 
 .fmm-sidebar__item:hover,
 .fmm-sidebar__item:focus-within {
-	background: var(--fmm-surface-subtle);
+	background: var(--fmm-surface-muted);
 }
 
 .fmm-sidebar__item.is-active {
 	background: var(--fmm-accent-soft);
-	border-left-color: var(--fmm-accent);
 }
 
 /* Folder tree: subfolders are indented; the chevron column only exists while any folder has subfolders */
 .fmm-sidebar__item {
-	padding-left: calc(var(--fmm-depth, 0) * 16px);
+	padding-inline-start: calc(var(--fmm-depth, 0) * 16px);
 }
 
 /* Leaf rows have no chevron button: pad by its width (20px + 4px margin) while the tree has any. */
 .fmm-sidebar.has-tree .fmm-sidebar__item--leaf {
-	padding-left: calc(var(--fmm-depth, 0) * 16px + 24px);
+	padding-inline-start: calc(var(--fmm-depth, 0) * 16px + 24px);
 }
 
 .fmm-folder-toggle {
@@ -374,12 +375,12 @@
 	justify-content: center;
 	width: 20px;
 	height: 24px;
-	margin-left: 4px;
+	margin-inline-start: 4px;
 	padding: 0;
 	color: var(--fmm-text-muted);
 	background: none;
 	border: 0;
-	border-radius: 2px;
+	border-radius: var(--fmm-radius-small);
 	cursor: pointer;
 }
 
@@ -388,7 +389,7 @@
 }
 
 .fmm-sidebar .fmm-folder-toggle:hover {
-	color: var(--fmm-primary-hover);
+	color: var(--fmm-text);
 }
 
 .fmm-sidebar .fmm-folder-toggle:focus {
@@ -412,7 +413,7 @@
 }
 
 .fmm-sidebar.has-tree .fmm-folder {
-	padding-left: 2px;
+	padding-inline-start: 2px;
 }
 
 .fmm-folder {
@@ -421,13 +422,15 @@
 	align-items: center;
 	gap: 8px;
 	min-width: 0;
-	padding: 7px 9px;
+	padding-block: 7px;
+	padding-inline: 10px 6px;
 	color: var(--fmm-text-body);
 	font-size: 13px;
-	line-height: 1.4;
-	text-align: left;
+	line-height: 20px;
+	text-align: start;
 	background: none;
 	border: 0;
+	border-radius: var(--fmm-radius-control);
 	cursor: pointer;
 }
 
@@ -486,17 +489,24 @@
 	color: var(--fmm-text-muted);
 	font-size: 12px;
 	font-weight: 400;
+	font-variant-numeric: tabular-nums;
+}
+
+.fmm-sidebar__item.is-active .fmm-folder__count {
+	color: var(--fmm-text-body);
 }
 
 /* Subfolder and menu buttons: always in the DOM and focusable, shown in place of the count on hover/focus */
 .fmm-folder__actions {
 	position: absolute;
 	top: 50%;
-	right: 6px;
+	inset-inline-end: 6px;
 	display: flex;
 	flex: none;
-	padding-left: 4px;
+	gap: 2px;
+	padding-inline-start: 4px;
 	background: inherit; /* Row color: normal, hover, active, drop target. */
+	border-radius: var(--fmm-radius-small);
 	opacity: 0;
 	transform: translateY(-50%);
 }
@@ -509,15 +519,15 @@
 
 /*
  * While the actions are shown, the folder button gives up their width
- * (2 buttons of 22px + 4px gap + 6px offset) so the name ends with an
- * ellipsis before them instead of running underneath.
+ * (2 buttons of 24px + 2px gap + 4px padding + 6px offset) so the name ends
+ * with an ellipsis before them instead of running underneath.
  */
 @media screen and (min-width: 783px) {
 
 	.fmm-sidebar__item:has(.fmm-folder__actions):hover .fmm-folder,
 	.fmm-sidebar__item:has(.fmm-folder__actions):focus-within .fmm-folder,
 	.fmm-sidebar__item.is-menu-open .fmm-folder {
-		padding-right: 54px;
+		padding-inline-end: 60px;
 	}
 
 	.fmm-sidebar__item:has(.fmm-folder__actions):hover .fmm-folder__count,
@@ -532,20 +542,38 @@
 	display: flex;
 	flex: none;
 	gap: 2px;
-	padding-right: 6px;
+	padding-inline-end: 6px;
 }
 
 .fmm-sidebar .fmm-folder__actions .button-link,
 .fmm-sidebar .fmm-folder__assign .button-link {
-	padding: 4px 3px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	box-sizing: border-box;
+	width: 24px;
+	height: 24px;
+	margin: 0;
+	padding: 0;
 	color: var(--fmm-text-muted);
 	text-decoration: none;
-	border-radius: 2px;
+	border-radius: var(--fmm-radius-small);
+	transition: background-color var(--fmm-transition), color var(--fmm-transition);
 }
 
 .fmm-sidebar .fmm-folder__actions .button-link:hover,
 .fmm-sidebar .fmm-folder__assign .button-link:hover {
-	color: var(--fmm-primary-hover);
+	color: var(--fmm-text);
+	background: rgba(15, 23, 42, 0.06);
+}
+
+.fmm-sidebar .is-menu-open .fmm-folder__actions .fmm-folder-menu-toggle {
+	color: var(--fmm-accent);
+	background: var(--fmm-accent-soft);
+}
+
+.fmm-sidebar .is-active.is-menu-open .fmm-folder__actions .fmm-folder-menu-toggle {
+	background: var(--fmm-accent-border);
 }
 
 .fmm-sidebar .fmm-folder__actions .button-link:focus,
@@ -561,8 +589,6 @@
 	box-shadow: none;
 }
 
-.fmm-sidebar .fmm-menu .fmm-folder-delete:hover,
-.fmm-sidebar .fmm-menu .fmm-folder-delete:focus,
 .fmm-sidebar .fmm-folder__assign .fmm-folder-remove:hover,
 .fmm-sidebar .fmm-folder__assign .fmm-folder-remove:focus {
 	color: var(--fmm-danger);
@@ -574,48 +600,52 @@
 	height: 16px;
 }
 
-/* Actions menu (inline disclosure inside the folder row) */
+/* Actions menu (inline disclosure inside the folder row); same look as the sort menu */
 .fmm-sidebar .fmm-menu {
 	position: absolute;
-	top: 100%;
-	right: 6px;
+	top: calc(100% + 4px);
+	inset-inline-end: 8px;
 	z-index: 20;
-	min-width: 160px;
-	padding: 4px 0;
+	box-sizing: border-box;
+	min-width: 190px;
+	padding: 4px;
 	background: var(--fmm-surface);
 	border: 1px solid var(--fmm-border);
+	border-radius: var(--fmm-radius-card);
 	box-shadow: var(--fmm-shadow-popover);
 }
 
 .fmm-sidebar .fmm-menu__item {
+	position: relative;
 	display: flex;
 	align-items: center;
-	gap: 8px;
+	gap: 10px;
+	box-sizing: border-box;
 	width: 100%;
+	height: 32px;
 	margin: 0;
-	padding: 6px 12px;
+	padding: 0 10px;
 	color: var(--fmm-text-body);
 	font-size: 13px;
-	line-height: 1.4;
-	text-align: left;
+	line-height: 1;
+	text-align: start;
 	background: none;
 	border: 0;
-	border-radius: 0;
+	border-radius: var(--fmm-radius-small);
 	cursor: pointer;
 }
 
 .fmm-sidebar .fmm-menu__item:hover {
-	color: var(--fmm-primary-hover);
-	background: var(--fmm-surface-muted);
+	background: var(--fmm-surface-subtle);
 }
 
 .fmm-sidebar .fmm-menu__item:focus {
-	background: var(--fmm-surface-muted);
 	outline: 0;
 	box-shadow: none;
 }
 
 .fmm-sidebar .fmm-menu__item:focus-visible {
+	background: var(--fmm-accent-soft);
 	outline: var(--fmm-focus-width) solid var(--fmm-focus);
 	outline-offset: -2px;
 	box-shadow: none;
@@ -627,31 +657,58 @@
 	color: var(--fmm-text-muted);
 }
 
-.fmm-sidebar .fmm-menu .fmm-folder-delete:hover .fmm-icon,
-.fmm-sidebar .fmm-menu .fmm-folder-delete:focus .fmm-icon {
+.fmm-sidebar .fmm-menu__item:hover .fmm-icon {
+	color: var(--fmm-text-body);
+}
+
+/* Delete: set apart by a fine line (4px above and below, drawn outside the hit areas) */
+.fmm-sidebar .fmm-menu .fmm-folder-delete {
+	margin-top: 9px;
+	color: var(--fmm-danger);
+}
+
+.fmm-sidebar .fmm-menu .fmm-folder-delete::before {
+	content: "";
+	position: absolute;
+	inset-inline: 0;
+	top: -5px;
+	height: 1px;
+	background: var(--fmm-border);
+	pointer-events: none;
+}
+
+.fmm-sidebar .fmm-menu .fmm-folder-delete .fmm-icon,
+.fmm-sidebar .fmm-menu .fmm-folder-delete:hover .fmm-icon {
 	color: inherit;
 }
 
+.fmm-sidebar .fmm-menu .fmm-folder-delete:hover,
+.fmm-sidebar .fmm-menu .fmm-folder-delete:focus-visible {
+	color: var(--fmm-danger);
+	background: var(--fmm-danger-soft);
+}
+
 .fmm-sidebar__selection {
-	margin: 10px 12px 0;
+	margin: 8px 16px 0;
 	padding: 8px 10px;
 	color: var(--fmm-text-body);
 	font-size: 12px;
 	line-height: 1.5;
-	background: var(--fmm-surface-muted);
-	border-left: 3px solid var(--fmm-accent);
+	background: var(--fmm-accent-soft);
+	border: 1px solid var(--fmm-accent-border);
+	border-radius: var(--fmm-radius-control);
 }
 
 /* Drag-and-drop target */
 .fmm-sidebar__item.is-drop-target {
-	background: var(--fmm-surface-muted);
+	background: var(--fmm-accent-soft);
 	outline: 1px dashed var(--fmm-accent);
 	outline-offset: -1px;
 }
 
 /* Drag-and-drop folder reordering and moving into a folder */
 .fmm-sidebar__item.is-drop-into {
-	background: var(--fmm-surface-muted);
+	background: var(--fmm-accent-soft);
 	outline: 1px dashed var(--fmm-accent);
 	outline-offset: -1px;
 }
@@ -679,8 +736,9 @@
 	padding: 4px 10px;
 	color: var(--fmm-on-primary);
 	font-size: 12px;
+	font-weight: 500;
 	background: var(--fmm-primary);
-	border-radius: 2px;
+	border-radius: var(--fmm-radius-small);
 }
 
 .fmm-sidebar__notice.notice.is-dismissible {
@@ -867,17 +925,42 @@
 /* Inline create/rename form */
 .fmm-form {
 	flex: 1 1 auto;
-	padding: 6px 9px 8px;
+	padding: 6px 8px 8px;
 }
 
-.fmm-form__input {
+.fmm-form .fmm-form__input {
+	box-sizing: border-box;
 	width: 100%;
+	max-width: none;
+	height: 32px;
+	min-height: 32px;
 	margin: 0 0 6px;
+	padding: 0 10px;
+	color: var(--fmm-text);
+	font-size: 13px;
+	background: var(--fmm-surface);
+	border: 1px solid var(--fmm-border);
+	border-radius: var(--fmm-radius-control);
+	box-shadow: none;
+}
+
+.fmm-form .fmm-form__input:hover {
+	border-color: var(--fmm-border-strong);
 }
 
 .fmm-form__buttons {
 	display: flex;
 	gap: 6px;
+}
+
+.fmm-form .fmm-form__buttons .button {
+	height: 28px;
+	min-height: 28px;
+	margin: 0;
+	padding: 0 12px;
+	font-size: 13px;
+	line-height: 26px;
+	border-radius: var(--fmm-radius-control);
 }
 
 /*
@@ -922,9 +1005,13 @@ select#media-attachment-filters ~ select#fmm-attachment-folder-filter {
 
 	.fmm-folder__actions {
 		position: static;
-		padding-right: 6px;
+		padding-inline-end: 6px;
 		opacity: 1;
 		transform: none;
+	}
+
+	.fmm-sidebar .fmm-menu__item {
+		height: 40px;
 	}
 
 	.fmm-sidebar__item .fmm-folder__count {
@@ -933,7 +1020,8 @@ select#media-attachment-filters ~ select#fmm-attachment-folder-filter {
 
 	.fmm-sidebar .fmm-folder__actions .button-link,
 	.fmm-sidebar .fmm-folder__assign .button-link {
-		padding: 8px 6px;
+		width: 32px;
+		height: 32px;
 	}
 
 	.fmm-folder {
