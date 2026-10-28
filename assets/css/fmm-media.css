@@ -52,26 +52,18 @@
 	box-shadow: 0 0 0 1px var(--fmm-accent);
 }
 
-/* Layout: sidebar next to the media grid */
-.fmm-layout {
-	display: flex;
-	align-items: flex-start;
-	gap: 20px;
-}
-
-.fmm-layout > .media-frame {
-	flex: 1 1 auto;
-	min-width: 0;
+/* Layout: folder rail next to the media grid (desktop: full-height column, see the media query below) */
+.fmm-layout__rail {
+	margin: 10px 0 20px;
 }
 
 .fmm-sidebar {
-	flex: 0 0 220px;
-	min-width: 0; /* Long folder names must not widen the sidebar (flex min-width: auto). */
+	min-width: 0; /* Long folder names must not widen the sidebar. */
 	box-sizing: border-box;
-	margin-top: 10px;
 	padding: 12px 0;
 	background: var(--fmm-surface);
 	border: 1px solid var(--fmm-border);
+	border-radius: var(--fmm-radius-card);
 	box-shadow: var(--fmm-shadow-sm);
 }
 
@@ -742,15 +734,6 @@ select#media-attachment-filters ~ select#fmm-attachment-folder-filter {
 }
 
 @media screen and (max-width: 782px) {
-	.fmm-layout {
-		flex-direction: column;
-		align-items: stretch;
-	}
-
-	.fmm-sidebar {
-		flex-basis: auto;
-	}
-
 	.fmm-folder__actions {
 		position: static;
 		padding-right: 6px;
@@ -783,5 +766,63 @@ select#media-attachment-filters ~ select#fmm-attachment-folder-filter {
 	.fmm .fmm-sidebar__item.is-active .fmm-icon,
 	.fmm-sidebar .fmm-sidebar__item.fmm-sidebar__item--folder.is-active .fmm-folder .fmm-icon {
 		color: Highlight;
+	}
+}
+
+/*
+ * Desktop: the rail is a continuous white column from the admin menu to the
+ * viewport bottom. It is positioned absolutely inside #wp-media-grid (no flex or
+ * grid on the wrap: core floats the Help tab into it); the sidebar sticks below
+ * the admin bar and scrolls its list internally.
+ */
+@media screen and (min-width: 783px) {
+
+	.fmm-layout {
+		--fmm-rail-width: clamp(260px, 22vw, 320px);
+		position: relative;
+		box-sizing: border-box;
+		min-height: calc(100vh - var(--wp-admin--admin-bar--height, 32px) - 65px);
+		padding-inline-start: calc(var(--fmm-rail-width) + 24px);
+	}
+
+	.wrap.fmm-layout {
+		margin-top: 0;
+		margin-inline-start: -20px;
+		padding-top: 10px;
+	}
+
+	.fmm-layout__rail {
+		position: absolute;
+		box-sizing: border-box;
+		inset-block: 0;
+		inset-inline-start: 0;
+		width: var(--fmm-rail-width);
+		margin: 0;
+		background: var(--fmm-surface);
+		border-inline-end: 1px solid var(--fmm-border);
+	}
+
+	.fmm-layout__rail .fmm-sidebar {
+		position: sticky;
+		top: var(--wp-admin--admin-bar--height, 32px);
+		display: flex;
+		flex-direction: column;
+		height: calc(100vh - var(--wp-admin--admin-bar--height, 32px));
+		max-height: 100%;
+		margin: 0;
+		padding: 16px 0 0;
+		background: transparent;
+		border: 0;
+		border-radius: 0;
+		box-shadow: none;
+	}
+
+	.fmm-layout__rail .fmm-sidebar__list {
+		flex: 1 1 auto;
+		min-height: 0;
+		padding-bottom: 12px;
+		overflow-x: hidden;
+		overflow-y: auto;
+		overscroll-behavior: contain;
 	}
 }

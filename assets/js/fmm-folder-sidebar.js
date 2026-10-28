@@ -640,9 +640,15 @@
 
 			this.$el.on( 'click', '.fmm-folder-menu-toggle', function() {
 				var id = rowValue( this );
+				var menu;
 				self.menuOpen = self.menuOpen === id ? null : id;
 				self.render();
 				self.focusKey( 'menu-' + id );
+				// The list scrolls inside the rail: keep a menu on the last rows in view.
+				menu = self.menuOpen ? document.getElementById( 'fmm-folder-menu-' + id ) : null;
+				if ( menu ) {
+					menu.scrollIntoView( { block: 'nearest' } );
+				}
 			} );
 
 			this.$el.on( 'click', '.fmm-folder-moveto', function() {
@@ -2268,7 +2274,7 @@
 	} );
 
 	$( document ).on( 'wp-media-grid-ready', function( event, frame ) {
-		var sidebar;
+		var sidebar, $wrap;
 
 		if ( ! frame || ! frame.$el || ! frame.state || ! frame.state().get( 'library' ) ) {
 			return;
@@ -2279,8 +2285,14 @@
 		}
 
 		sidebar = new Sidebar( frame );
-		frame.$el.wrap( '<div class="fmm-layout"></div>' );
-		frame.$el.parent().prepend( sidebar.$el );
+		$wrap = frame.$el.parent();
+		if ( $wrap.is( '#wp-media-grid' ) ) {
+			$wrap.addClass( 'fmm-layout' );
+		} else {
+			frame.$el.wrap( '<div class="fmm-layout"></div>' );
+		}
+		// The rail sits before the grid so reading and tab order stay: heading, notices, folders, grid.
+		$( '<div class="fmm fmm-layout__rail"></div>' ).append( sidebar.$el ).insertBefore( frame.$el );
 
 		// The grid computes its columns from the container width.
 		$( window ).trigger( 'resize' );
