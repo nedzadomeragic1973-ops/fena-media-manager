@@ -53,7 +53,10 @@
 		color: 'swatch',
 		'move-up': 'arrow-up',
 		'move-down': 'arrow-down',
-		'delete': 'trash'
+		'delete': 'trash',
+		search: 'magnifying-glass',
+		sort: 'bars-arrow-down',
+		check: 'check'
 	};
 
 	var SVG_NS = 'http://www.w3.org/2000/svg';
@@ -252,11 +255,10 @@
 		this.$el.append(
 			$( '<div class="fmm-sidebar__header"></div>' ).append(
 				$( '<h2 class="fmm-sidebar__title"></h2>' ).text( __( 'Folders', 'fena-media-manager' ) ),
-				store.canManage ? $( '<button type="button" class="button button-small fmm-sidebar__new" data-fmm-key="new"></button>' )
+				store.canManage ? $( '<button type="button" class="fmm-sidebar__new" data-fmm-key="new"></button>' )
 					.append( icon( 'create' ), $( '<span></span>' ).text( __( 'New Folder', 'fena-media-manager' ) ) ) : null
 			),
-			this.searchControl(),
-			this.sortControl(),
+			$( '<div class="fmm-sidebar__toolbar"></div>' ).append( this.searchControl(), this.sortControl() ),
 			$( '<div class="fmm-sidebar__notice notice inline is-dismissible" hidden></div>' ).append(
 				'<p></p>',
 				$( '<button type="button" class="notice-dismiss"></button>' ).append(
@@ -323,6 +325,7 @@
 		searchControl: function() {
 			return $( '<div class="fmm-search" role="search"></div>' ).append(
 				$( '<label class="screen-reader-text" for="fmm-folder-search"></label>' ).text( __( 'Search folders', 'fena-media-manager' ) ),
+				icon( 'search' ).addClass( 'fmm-search__icon' ),
 				$( '<input type="search" id="fmm-folder-search" class="fmm-search__input" autocomplete="off" spellcheck="false" />' ).attr( 'placeholder', __( 'Search folders…', 'fena-media-manager' ) )
 			);
 		},
@@ -441,27 +444,101 @@
 		},
 
 		/**
-		 * Sort mode select; the server sorts, this only stores the choice.
+		 * Sort mode menu button; the server sorts, this only stores the choice.
 		 *
 		 * @return {jQuery} Sort control.
 		 */
 		sortControl: function() {
-			var $select = $( '<select id="fmm-folder-sort" class="fmm-sort__select"></select>' );
+			var $menu = $( '<div id="fmm-sort-menu" class="fmm-sort__menu" role="menu" aria-labelledby="fmm-folder-sort" hidden></div>' );
 
-			_.each( {
+			this.sortModes = {
 				name_asc: __( 'Name (A–Z)', 'fena-media-manager' ),
 				name_desc: __( 'Name (Z–A)', 'fena-media-manager' ),
 				newest: __( 'Newest first', 'fena-media-manager' ),
 				oldest: __( 'Oldest first', 'fena-media-manager' ),
 				manual: __( 'Manual order', 'fena-media-manager' )
-			}, function( label, mode ) {
-				$select.append( $( '<option></option>' ).val( mode ).text( label ) );
+			};
+
+			_.each( this.sortModes, function( label, mode ) {
+				$menu.append( $( '<button type="button" class="fmm-sort__item" role="menuitemradio" aria-checked="false" tabindex="-1"></button>' )
+					.attr( 'data-sort', mode ).append( icon( 'check' ), $( '<span></span>' ).text( label ) ) );
 			} );
 
 			return $( '<div class="fmm-sort"></div>' ).append(
-				$( '<label class="screen-reader-text" for="fmm-folder-sort"></label>' ).text( __( 'Sort folders', 'fena-media-manager' ) ),
-				$select
+				$( '<button type="button" id="fmm-folder-sort" class="fmm-sort__button" aria-haspopup="menu" aria-expanded="false" aria-controls="fmm-sort-menu"></button>' ).append( icon( 'sort' ) ),
+				$menu
 			);
+		},
+
+		/**
+		 * Button name and checked item follow the stored sort mode.
+		 */
+		syncSort: function() {
+			/* translators: %s: current sort order, e.g. "Name (A–Z)". */
+			var label = sprintf( __( 'Sort folders: %s', 'fena-media-manager' ), this.sortModes[ store.sort ] || '' );
+
+			this.$el.find( '.fmm-sort__button' ).attr( { 'aria-label': label, title: label } );
+			this.$el.find( '.fmm-sort__item' ).each( function() {
+				this.setAttribute( 'aria-checked', String( this.getAttribute( 'data-sort' ) === store.sort ) );
+			} );
+		},
+
+		/**
+		 * Opens the sort menu.
+		 *
+		 * @param {boolean} [last] Focus the last item instead of the checked one.
+		 */
+		openSort: function( last ) {
+			var $items;
+
+			if ( this.menuOpen ) {
+				this.closeMenu();
+			}
+			this.$el.find( '.fmm-sort__button' ).attr( 'aria-expanded', 'true' );
+			this.$el.find( '.fmm-sort__menu' ).prop( 'hidden', false );
+			$items = this.$el.find( '.fmm-sort__item' );
+			( last ? $items.last() : $items.filter( '[aria-checked="true"]' ).first() ).trigger( 'focus' );
+		},
+
+		/**
+		 * Closes the sort menu.
+		 *
+		 * @param {boolean} [refocus] Move focus back to the button.
+		 */
+		closeSort: function( refocus ) {
+			this.$el.find( '.fmm-sort__button' ).attr( 'aria-expanded', 'false' );
+			this.$el.find( '.fmm-sort__menu' ).prop( 'hidden', true );
+			if ( refocus ) {
+				this.$el.find( '.fmm-sort__button' ).trigger( 'focus' );
+			}
+		},
+
+		isSortOpen: function() {
+			return ! this.$el.find( '.fmm-sort__menu' ).prop( 'hidden' );
+		},
+
+		/**
+		 * Stores a chosen sort mode.
+		 *
+		 * @param {string} mode Sort mode.
+		 */
+		chooseSort: function( mode ) {
+			var self = this;
+			var label = this.sortModes[ mode ];
+
+			this.closeSort( true );
+			if ( mode === store.sort || ! label ) {
+				return;
+			}
+			store.setSort( mode ).then( function() {
+				if ( wp.a11y ) {
+					/* translators: %s: sort order, e.g. "Name (A–Z)". */
+					wp.a11y.speak( sprintf( __( 'Folders sorted: %s.', 'fena-media-manager' ), label ), 'polite' );
+				}
+			} ).catch( function( error ) {
+				self.fail( error, __( 'The sort order could not be saved.', 'fena-media-manager' ) );
+				self.syncSort();
+			} );
 		},
 
 		/**
@@ -623,24 +700,71 @@
 				}
 			} );
 
-			this.$el.on( 'change', '.fmm-sort__select', function() {
-				var $select = $( this );
-				var label = $select.find( 'option:selected' ).text();
+			this.$el.on( 'click', '.fmm-sort__button', function() {
+				if ( self.isSortOpen() ) {
+					self.closeSort( false );
+				} else {
+					self.openSort( false );
+				}
+			} );
 
-				store.setSort( $select.val() ).then( function() {
-					if ( wp.a11y ) {
-						/* translators: %s: sort order, e.g. "Name (A–Z)". */
-						wp.a11y.speak( sprintf( __( 'Folders sorted: %s.', 'fena-media-manager' ), label ), 'polite' );
+			this.$el.on( 'keydown', '.fmm-sort__button', function( event ) {
+				if ( 'ArrowDown' === event.key || 'ArrowUp' === event.key ) {
+					event.preventDefault();
+					self.openSort( 'ArrowUp' === event.key );
+				}
+			} );
+
+			this.$el.on( 'click', '.fmm-sort__item', function() {
+				self.chooseSort( this.getAttribute( 'data-sort' ) );
+			} );
+
+			this.$el.on( 'keydown', '.fmm-sort__menu', function( event ) {
+				var $items = $( this ).find( '.fmm-sort__item' );
+				var index = $items.index( document.activeElement );
+
+				if ( 'Escape' === event.key ) {
+					event.preventDefault();
+					event.stopPropagation();
+					self.closeSort( true );
+					return;
+				}
+				if ( 'Tab' === event.key ) {
+					self.closeSort( false );
+					return;
+				}
+				if ( 'Enter' === event.key || ' ' === event.key ) {
+					event.preventDefault();
+					if ( index >= 0 ) {
+						self.chooseSort( $items.eq( index ).attr( 'data-sort' ) );
 					}
-				} ).catch( function( error ) {
-					self.fail( error, __( 'The sort order could not be saved.', 'fena-media-manager' ) );
-					$select.val( store.sort );
-				} );
+					return;
+				}
+				if ( 'ArrowDown' === event.key ) {
+					index = ( index + 1 ) % $items.length;
+				} else if ( 'ArrowUp' === event.key ) {
+					index = ( index + $items.length - 1 ) % $items.length;
+				} else if ( 'Home' === event.key ) {
+					index = 0;
+				} else if ( 'End' === event.key ) {
+					index = $items.length - 1;
+				} else {
+					return;
+				}
+				event.preventDefault();
+				$items.eq( index ).trigger( 'focus' );
+			} );
+
+			$( document ).on( 'click', function( event ) {
+				if ( self.isSortOpen() && ! $( event.target ).closest( '.fmm-sort' ).length ) {
+					self.closeSort( false );
+				}
 			} );
 
 			this.$el.on( 'click', '.fmm-folder-menu-toggle', function() {
 				var id = rowValue( this );
 				var menu;
+				self.closeSort( false );
 				self.menuOpen = self.menuOpen === id ? null : id;
 				self.render();
 				self.focusKey( 'menu-' + id );
@@ -1830,7 +1954,7 @@
 			this.list.textContent = '';
 			this.list.appendChild( frag );
 
-			this.$el.find( '.fmm-sort__select' ).val( store.sort );
+			this.syncSort();
 			this.renderSelectionUi( ctx.selected );
 
 			// The active folder was deleted elsewhere: fall back to all media.
@@ -2063,6 +2187,7 @@
 		 * @param {string} [parent] Parent folder ID for a new subfolder.
 		 */
 		startEdit: function( id, parent ) {
+			this.closeSort( false );
 			this.editing = id;
 			this.menuOpen = null;
 			this.newParent = 'new' === id && parent ? String( parent ) : '';
