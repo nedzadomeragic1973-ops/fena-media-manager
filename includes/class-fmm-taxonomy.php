@@ -43,6 +43,16 @@ class FMM_Taxonomy {
 	const COLOR_PRESETS = array( 'blue', 'violet', 'sand', 'green' );
 
 	/**
+	 * Term meta key of the folder icon. The plain folder (default) stores nothing.
+	 */
+	const ICON_META = 'fmm_icon';
+
+	/**
+	 * Folder icons: glyphs drawn on the folder (see FMM_Icons::GLYPHS).
+	 */
+	const ICONS = array( 'image', 'video', 'document', 'audio', 'archive', 'star', 'people', 'tag' );
+
+	/**
 	 * Available folder sort modes.
 	 */
 	const SORT_MODES = array( 'name_asc', 'name_desc', 'newest', 'oldest', 'manual' );
@@ -108,6 +118,27 @@ class FMM_Taxonomy {
 				'show_in_rest'      => false,
 			)
 		);
+
+		register_term_meta(
+			self::NAME,
+			self::ICON_META,
+			array(
+				'type'              => 'string',
+				'single'            => true,
+				'sanitize_callback' => array( __CLASS__, 'sanitize_icon' ),
+				'show_in_rest'      => false,
+			)
+		);
+	}
+
+	/**
+	 * Sanitizes a folder icon key.
+	 *
+	 * @param mixed $raw Raw icon.
+	 * @return string Key from ICONS, or '' (plain folder / invalid).
+	 */
+	public static function sanitize_icon( $raw ) {
+		return is_string( $raw ) && in_array( $raw, self::ICONS, true ) ? $raw : '';
 	}
 
 	/**
@@ -394,6 +425,7 @@ class FMM_Taxonomy {
 			'count'  => (int) $term->count,
 			'order'  => (int) get_term_meta( $term->term_id, self::ORDER_META, true ),
 			'color'  => self::sanitize_color( get_term_meta( $term->term_id, self::COLOR_META, true ) ),
+			'icon'   => self::sanitize_icon( get_term_meta( $term->term_id, self::ICON_META, true ) ),
 		);
 	}
 

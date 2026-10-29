@@ -9,7 +9,7 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Exports the folder tree and imports it again after validation and a preview.
- * Only structure, names, colors and manual order are transferred; media,
+ * Only structure, names, colors, icons and manual order are transferred; media,
  * assignments, IDs and settings never are.
  */
 class FMM_Transfer {
@@ -141,7 +141,7 @@ class FMM_Transfer {
 	// ---------------------------------------------------------------- export.
 
 	/**
-	 * Folder tree in manual order as nested arrays (name, color, children).
+	 * Folder tree in manual order as nested arrays (name, color, icon, children).
 	 *
 	 * @return array
 	 */
@@ -168,6 +168,9 @@ class FMM_Transfer {
 			$node   = array( 'name' => $folder['name'] );
 			if ( '' !== $folder['color'] ) {
 				$node['color'] = $folder['color'];
+			}
+			if ( '' !== $folder['icon'] ) {
+				$node['icon'] = $folder['icon'];
 			}
 			$children = self::nest( $flat, $pos, $depth + 1 );
 			if ( $children ) {
@@ -367,7 +370,7 @@ class FMM_Transfer {
 			}
 
 			foreach ( array_keys( get_object_vars( $item ) ) as $key ) {
-				if ( ! in_array( (string) $key, array( 'name', 'color', 'children' ), true ) ) {
+				if ( ! in_array( (string) $key, array( 'name', 'color', 'icon', 'children' ), true ) ) {
 					self::add_error( $state, $here . '.' . $key, __( 'Unknown key.', 'fena-media-manager' ) );
 				}
 			}
@@ -382,6 +385,7 @@ class FMM_Transfer {
 			}
 
 			$color = self::validate_color( $item, $here, $state );
+			$icon  = self::validate_icon( $item, $here, $state );
 
 			$children = array();
 			if ( property_exists( $item, 'children' ) ) {
@@ -395,6 +399,7 @@ class FMM_Transfer {
 			$nodes[] = array(
 				'name'     => (string) $name,
 				'color'    => $color,
+				'icon'     => $icon,
 				'children' => $children,
 			);
 		}
@@ -437,6 +442,28 @@ class FMM_Transfer {
 		}
 
 		return $name;
+	}
+
+	/**
+	 * Validates the optional icon of a folder.
+	 *
+	 * @param stdClass $item  Folder object.
+	 * @param string   $path  Path of the folder.
+	 * @param array    $state Walker state.
+	 * @return string Icon key, or '' for the plain folder.
+	 */
+	private static function validate_icon( $item, $path, &$state ) {
+		if ( ! property_exists( $item, 'icon' ) ) {
+			return '';
+		}
+
+		if ( is_string( $item->icon ) && in_array( $item->icon, FMM_Taxonomy::ICONS, true ) ) {
+			return $item->icon;
+		}
+
+		self::add_error( $state, $path . '.icon', __( 'Must be one of image, video, document, audio, archive, star, people or tag (omit it for the default folder).', 'fena-media-manager' ) );
+
+		return '';
 	}
 
 	/**
@@ -841,7 +868,7 @@ class FMM_Transfer {
 
 	/**
 	 * Applies a list of nodes below a parent folder. Every created folder
-	 * (term and position/color meta) is written in one transaction, so an
+	 * (term and position/color/icon meta) is written in one transaction, so an
 	 * interrupted request leaves no folder without its position. This needs
 	 * InnoDB (the WordPress default); on MyISAM the old small window remains.
 	 *
@@ -888,9 +915,9 @@ class FMM_Transfer {
 						++$summary['meta_failed'];
 						self::note_failure( $summary, $here, __( 'The folder was created, but its position could not be saved.', 'fena-media-manager' ) );
 					}
-					if ( '' !== $node['color'] && ! update_term_meta( $id, FMM_Taxonomy::COLOR_META, $node['color'] ) ) {
+					if ( ( '' !== $node['color'] && ! update_term_meta( $id, FMM_Taxonomy::COLOR_META, $node['color'] ) ) || ( '' !== $node['icon'] && ! update_term_meta( $id, FMM_Taxonomy::ICON_META, $node['icon'] ) ) ) {
 						++$summary['meta_failed'];
-						self::note_failure( $summary, $here, __( 'The folder was created, but its color could not be saved.', 'fena-media-manager' ) );
+						self::note_failure( $summary, $here, __( 'The folder was created, but its color or icon could not be saved.', 'fena-media-manager' ) );
 					}
 					$wpdb->query( 'COMMIT' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Transaction control.
 
@@ -963,7 +990,7 @@ class FMM_Transfer {
 		}
 		if ( $meta > 0 ) {
 			/* translators: %d: number of folders. */
-			$problems[] = sprintf( _n( '%d folder was created, but its color or position could not be saved.', '%d folders were created, but their color or position could not be saved.', $meta, 'fena-media-manager' ), $meta );
+			$problems[] = sprintf( _n( '%d folder was created, but its color, icon or position could not be saved.', '%d folders were created, but their color, icon or position could not be saved.', $meta, 'fena-media-manager' ), $meta );
 		}
 		$problem_text = implode( ' ', $problems );
 
@@ -997,7 +1024,7 @@ class FMM_Transfer {
 					<form method="post" action="<?php echo esc_url( $admin ); ?>">
 						<input type="hidden" name="action" value="fmm_export" />
 						<?php wp_nonce_field( 'fmm_export' ); ?>
-						<p class="fmm-field__help" id="fmm-export-help"><?php esc_html_e( 'Downloads the folder structure (names, colors, hierarchy and manual order) as a JSON file. Media files, assignments and settings are not exported.', 'fena-media-manager' ); ?></p>
+						<p class="fmm-field__help" id="fmm-export-help"><?php esc_html_e( 'Downloads the folder structure (names, colors, icons, hierarchy and manual order) as a JSON file. Media files, assignments and settings are not exported.', 'fena-media-manager' ); ?></p>
 						<button type="submit" class="button" aria-describedby="fmm-export-help"><?php esc_html_e( 'Export folders', 'fena-media-manager' ); ?></button>
 					</form>
 					<?php if ( self::export_exceeds_limits() ) : ?>
@@ -1201,6 +1228,27 @@ class FMM_Transfer {
 	}
 
 	/**
+	 * Translated name of a folder icon.
+	 *
+	 * @param string $key Icon key.
+	 * @return string Name.
+	 */
+	private static function icon_label( $key ) {
+		$labels = array(
+			'image'    => __( 'Image', 'fena-media-manager' ),
+			'video'    => __( 'Video', 'fena-media-manager' ),
+			'document' => __( 'Document', 'fena-media-manager' ),
+			'audio'    => __( 'Audio', 'fena-media-manager' ),
+			'archive'  => __( 'Archive', 'fena-media-manager' ),
+			'star'     => __( 'Star', 'fena-media-manager' ),
+			'people'   => __( 'People', 'fena-media-manager' ),
+			'tag'      => __( 'Tag', 'fena-media-manager' ),
+		);
+
+		return isset( $labels[ $key ] ) ? $labels[ $key ] : $key;
+	}
+
+	/**
 	 * Renders the planned tree with the statuses of both strategies.
 	 *
 	 * @param array $merge Plan with the merge strategy.
@@ -1223,6 +1271,9 @@ class FMM_Transfer {
 				echo '<span class="fmm-swatch" aria-hidden="true"' . ( '' !== $node['color'] ? ' data-fmm-color="' . esc_attr( $node['color'] ) . '"' : '' ) . '></span>';
 			}
 			echo '<span class="fmm-tree__name">' . esc_html( $node['name'] ) . '</span> ';
+			if ( '' !== $node['icon'] ) {
+				echo '<span class="fmm-tree__icon">· ' . esc_html( self::icon_label( $node['icon'] ) ) . '</span> ';
+			}
 			echo '<span class="fmm-badge fmm-badge--' . esc_attr( $node['status'] ) . '" data-view="merge">' . esc_html( $labels[ $node['status'] ] ) . '</span>';
 			echo '<span class="fmm-badge fmm-badge--' . esc_attr( $other['status'] ) . '" data-view="skip" hidden>' . esc_html( $labels[ $other['status'] ] ) . '</span>';
 			echo '</span>';

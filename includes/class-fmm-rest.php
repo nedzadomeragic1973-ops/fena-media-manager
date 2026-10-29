@@ -80,6 +80,7 @@ class FMM_REST {
 							'minimum' => 0,
 						),
 						'color'  => array( 'type' => 'string' ),
+						'icon'   => array( 'type' => 'string' ),
 					),
 				),
 				array(
@@ -258,8 +259,9 @@ class FMM_REST {
 	}
 
 	/**
-	 * PATCH /folders/<id>. Renames, moves and/or recolors a folder (`color`:
-	 * preset key, #rrggbb, or ''/'gray' to reset); the slug stays stable; media assignments are untouched because the term_taxonomy_id
+	 * PATCH /folders/<id>. Renames, moves, recolors and/or sets the icon of a
+	 * folder (`color`: preset key, #rrggbb, or ''/'gray' to reset; `icon`: a key
+	 * of FMM_Taxonomy::ICONS, or ''/'folder' to reset); the slug stays stable; media assignments are untouched because the term_taxonomy_id
 	 * does not change. A moved folder goes to the end of its new level and
 	 * takes its subfolders along.
 	 *
@@ -272,7 +274,7 @@ class FMM_REST {
 			return self::not_found();
 		}
 
-		if ( ! $request->has_param( 'name' ) && ! $request->has_param( 'parent' ) && ! $request->has_param( 'color' ) ) {
+		if ( ! $request->has_param( 'name' ) && ! $request->has_param( 'parent' ) && ! $request->has_param( 'color' ) && ! $request->has_param( 'icon' ) ) {
 			return new WP_Error( 'fmm_nothing_to_update', __( 'Nothing to update.', 'fena-media-manager' ), array( 'status' => 400 ) );
 		}
 
@@ -320,6 +322,16 @@ class FMM_REST {
 			}
 		}
 
+		$icon = null;
+		if ( $request->has_param( 'icon' ) ) {
+			$raw   = $request['icon'];
+			$reset = in_array( $raw, array( '', 'folder' ), true );
+			$icon  = $reset ? '' : FMM_Taxonomy::sanitize_icon( $raw );
+			if ( ! $reset && '' === $icon ) {
+				return new WP_Error( 'fmm_invalid_icon', __( 'Invalid folder icon.', 'fena-media-manager' ), array( 'status' => 400 ) );
+			}
+		}
+
 		$order = $moved ? FMM_Taxonomy::next_order( $parent ) : 0;
 		if ( $args ) {
 			$result = wp_update_term( $folder->term_id, FMM_Taxonomy::NAME, $args );
@@ -334,6 +346,11 @@ class FMM_REST {
 			delete_term_meta( $folder->term_id, FMM_Taxonomy::COLOR_META );
 		} elseif ( null !== $color ) {
 			update_term_meta( $folder->term_id, FMM_Taxonomy::COLOR_META, $color );
+		}
+		if ( '' === $icon ) {
+			delete_term_meta( $folder->term_id, FMM_Taxonomy::ICON_META );
+		} elseif ( null !== $icon ) {
+			update_term_meta( $folder->term_id, FMM_Taxonomy::ICON_META, $icon );
 		}
 
 		return rest_ensure_response( FMM_Taxonomy::prepare_folder( FMM_Taxonomy::get_folder( $folder->term_id ) ) );

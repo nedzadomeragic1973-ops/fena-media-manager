@@ -84,6 +84,67 @@
 		return $( iconEl( name ) );
 	}
 
+	// Folder icons (stored keys, see FMM_Taxonomy::ICONS): glyphs drawn inside the folder.
+	var FOLDER_ICONS = [ 'image', 'video', 'document', 'audio', 'archive', 'star', 'people', 'tag' ];
+	var glyphCache = {};
+
+	function iconLabels() {
+		return {
+			'': __( 'None (Default)', 'fena-media-manager' ),
+			image: __( 'Image', 'fena-media-manager' ),
+			video: __( 'Video', 'fena-media-manager' ),
+			document: __( 'Document', 'fena-media-manager' ),
+			audio: __( 'Audio', 'fena-media-manager' ),
+			archive: __( 'Archive', 'fena-media-manager' ),
+			star: __( 'Star', 'fena-media-manager' ),
+			people: __( 'People', 'fena-media-manager' ),
+			tag: __( 'Tag', 'fena-media-manager' )
+		};
+	}
+
+	// Folder icon glyph: its own svg shown next to the folder icon (not inside it).
+	function glyphEl( key ) {
+		var node = glyphCache[ key ];
+		var use;
+
+		if ( ! node ) {
+			node = glyphCache[ key ] = document.createElementNS( SVG_NS, 'svg' );
+			use = document.createElementNS( SVG_NS, 'use' );
+			node.setAttribute( 'class', 'fmm-icon fmm-folder__glyph' );
+			node.setAttribute( 'aria-hidden', 'true' );
+			node.setAttribute( 'focusable', 'false' );
+			use.setAttribute( 'href', '#fmm-g-' + key );
+			node.appendChild( use );
+		}
+
+		return node.cloneNode( true );
+	}
+
+	// Folder icon plus, when the folder has an icon, the glyph after it.
+	function folderIconEls( key ) {
+		var els = [ iconEl( 'folder' ) ];
+
+		if ( _.contains( FOLDER_ICONS, key ) ) {
+			els.push( glyphEl( key ) );
+		}
+
+		return els;
+	}
+
+	// Stand-alone glyph (icon tiles).
+	function glyphIconEl( key ) {
+		var svg = document.createElementNS( SVG_NS, 'svg' );
+		var use = document.createElementNS( SVG_NS, 'use' );
+
+		svg.setAttribute( 'class', 'fmm-icon' );
+		svg.setAttribute( 'aria-hidden', 'true' );
+		svg.setAttribute( 'focusable', 'false' );
+		use.setAttribute( 'href', '#fmm-g-' + key );
+		svg.appendChild( use );
+
+		return svg;
+	}
+
 	function tag( name, className, type ) {
 		var el = document.createElement( name );
 
@@ -786,7 +847,7 @@
 				var id = rowValue( this );
 				self.menuOpen = null;
 				self.render();
-				self.openColorDialog( id );
+				self.openAppearanceDialog( id );
 			} );
 
 			this.$el.on( 'click', '.fmm-folder-up, .fmm-folder-down', function() {
@@ -1294,11 +1355,11 @@
 		},
 
 		/**
-		 * "Color…" dialog of a folder: a preview card, preset swatches and a custom color.
+		 * "Appearance…" dialog of a folder: a preview card, the color (preset swatches or custom) and the icon.
 		 *
 		 * @param {string} id Folder ID.
 		 */
-		openColorDialog: function( id ) {
+		openAppearanceDialog: function( id ) {
 			var self = this;
 			var folder = store.get( id );
 			var current = folder ? folder.color || '' : '';
@@ -1313,7 +1374,9 @@
 			];
 			var selected = custom ? 'custom' : ( current || 'gray' );
 			var startHex = custom ? current : DEFAULT_CUSTOM_COLOR;
-			var $picker, $hex, $customRow, $customSwatch, $preview, $caption, $fieldset, $body;
+			var currentIcon = folder && _.contains( FOLDER_ICONS, folder.icon ) ? folder.icon : '';
+			var iconNames = iconLabels();
+			var $picker, $hex, $customRow, $customSwatch, $preview, $caption, $fieldset, $iconSet, $previewIcon, $body;
 
 			if ( ! folder ) {
 				return;
@@ -1322,12 +1385,12 @@
 			$picker = $( '<input type="color" id="fmm-color-custom" />' ).val( startHex );
 			$hex = $( '<input type="text" id="fmm-color-hex" maxlength="7" spellcheck="false" autocomplete="off" />' ).attr( 'placeholder', DEFAULT_CUSTOM_COLOR ).val( startHex );
 			$caption = $( '<span class="fmm-appearance__caption"></span>' );
+			$previewIcon = $( iconEl( 'folder' ) ).addClass( 'fmm-appearance__icon' );
 			$preview = $( '<div class="fmm-appearance__preview"></div>' ).append(
-				iconEl( 'folder' ),
+				$previewIcon,
 				$( '<span class="fmm-appearance__name"></span>' ).text( folder.name ),
 				$caption
 			);
-			$preview.find( '.fmm-icon' ).addClass( 'fmm-appearance__icon' );
 			$fieldset = $( '<fieldset class="fmm-appearance__section"></fieldset>' ).append( $( '<legend></legend>' ).text( __( 'Color', 'fena-media-manager' ) ) );
 
 			function hexFrom( raw ) {
@@ -1349,6 +1412,10 @@
 				return $fieldset.find( 'input[name="fmm-color"]:checked' ).val();
 			}
 
+			function iconChoice() {
+				return $iconSet.find( 'input[name="fmm-icon"]:checked' ).val();
+			}
+
 			function showCustom( hex ) {
 				$customSwatch[ 0 ].style.setProperty( '--fmm-folder-color', hex );
 				$customSwatch[ 0 ].style.setProperty( '--fmm-check', checkColor( hex ) );
@@ -1357,16 +1424,23 @@
 			function refresh() {
 				var value = choice();
 				var hex = hexFrom( $hex.val() ) || String( $picker.val() ).toLowerCase();
+				var glyph = iconChoice();
+				var caption;
 
 				$customRow.prop( 'hidden', 'custom' !== value );
 				$preview.attr( 'data-fmm-color', 'custom' === value ? null : value );
 				if ( 'custom' === value ) {
 					$preview[ 0 ].style.setProperty( '--fmm-folder-color', hex );
 					/* translators: %s: color as a hex value, e.g. #7b61c9. */
-					$caption.text( sprintf( __( 'Custom · %s', 'fena-media-manager' ), hex ) );
+					caption = sprintf( __( 'Custom · %s', 'fena-media-manager' ), hex );
 				} else {
 					$preview[ 0 ].style.removeProperty( '--fmm-folder-color' );
-					$caption.text( _.findWhere( options, { value: value } ).label );
+					caption = _.findWhere( options, { value: value } ).label;
+				}
+				$caption.text( glyph ? caption + ' · ' + iconNames[ glyph ] : caption );
+				$preview.find( '.fmm-folder__glyph' ).remove();
+				if ( glyph ) {
+					$previewIcon.after( $( glyphEl( glyph ) ).addClass( 'fmm-appearance__glyph' ) );
 				}
 			}
 
@@ -1385,6 +1459,16 @@
 				}
 				$fieldset.append( $label );
 			} );
+
+			$iconSet = $( '<fieldset class="fmm-appearance__section fmm-appearance__icons"></fieldset>' ).append( $( '<legend></legend>' ).text( __( 'Icon', 'fena-media-manager' ) ) );
+			_.each( [ '' ].concat( FOLDER_ICONS ), function( key ) {
+				$iconSet.append( $( '<label class="fmm-icon-option"></label>' ).attr( 'title', iconNames[ key ] ).append(
+					$( '<input type="radio" name="fmm-icon" />' ).val( key ).prop( 'checked', key === currentIcon ),
+					$( '<span class="fmm-icon-tile" aria-hidden="true"></span>' ).append( key ? glyphIconEl( key ) : iconEl( 'folder' ) ),
+					$( '<span class="screen-reader-text"></span>' ).text( iconNames[ key ] )
+				) );
+			} );
+			$iconSet.on( 'change', 'input[name="fmm-icon"]', refresh );
 
 			$customRow = $( '<div class="fmm-appearance__custom"></div>' ).prop( 'hidden', 'custom' !== selected ).append(
 				$( '<label class="screen-reader-text" for="fmm-color-custom"></label>' ).text( __( 'Custom color', 'fena-media-manager' ) ),
@@ -1415,12 +1499,12 @@
 				refresh();
 			} );
 
-			$body = $( '<div class="fmm-appearance"></div>' ).append( $preview, $fieldset, $customRow );
+			$body = $( '<div class="fmm-appearance"></div>' ).append( $preview, $fieldset, $customRow, $iconSet );
 			refresh();
 
 			this.dialog( {
 				/* translators: %s: folder name. */
-				title: sprintf( __( 'Color of folder “%s”', 'fena-media-manager' ), folder.name ),
+				title: sprintf( __( 'Appearance of folder “%s”', 'fena-media-manager' ), folder.name ),
 				submit: __( 'Save', 'fena-media-manager' ),
 				focus: 'folder-' + id,
 				body: $body,
@@ -1428,13 +1512,21 @@
 					var picked = choice();
 					var hex = 'custom' === picked ? hexFrom( $hex.val() ) : '';
 					var value = 'custom' === picked ? hex : picked;
+					var glyph = iconChoice();
+					var data = {};
 
 					if ( 'custom' === picked && ! hex ) {
 						api.error( __( 'Enter a color as a hex value, e.g. #7b61c9.', 'fena-media-manager' ) );
 						$hex.trigger( 'focus' );
 						return;
 					}
-					if ( value === ( current || 'gray' ) ) {
+					if ( value !== ( current || 'gray' ) ) {
+						data.color = value;
+					}
+					if ( glyph !== currentIcon ) {
+						data.icon = glyph;
+					}
+					if ( _.isEmpty( data ) ) {
 						api.close();
 						return;
 					}
@@ -1445,10 +1537,13 @@
 					self.busy = true;
 					api.error( '' );
 					api.busy( true );
-					wp.apiFetch( { path: '/fmm/v1/folders/' + id, method: 'PATCH', data: { color: value } } ).then( function() {
+					wp.apiFetch( { path: '/fmm/v1/folders/' + id, method: 'PATCH', data: data } ).then( function() {
 						self.busy = false;
-						/* translators: %s: folder name. */
-						self.notice( sprintf( __( 'Color of folder “%s” changed.', 'fena-media-manager' ), folder.name ), 'success' );
+						self.notice( _.has( data, 'icon' ) ?
+							/* translators: %s: folder name. */
+							sprintf( __( 'Appearance of folder “%s” changed.', 'fena-media-manager' ), folder.name ) :
+							/* translators: %s: folder name. */
+							sprintf( __( 'Color of folder “%s” changed.', 'fena-media-manager' ), folder.name ), 'success' );
 						api.close();
 						return store.refresh().then( function() {
 							self.focusKey( 'folder-' + id );
@@ -1456,7 +1551,7 @@
 					}, function( error ) {
 						self.busy = false;
 						api.busy( false );
-						api.error( ( error && error.message ) || __( 'The color could not be saved.', 'fena-media-manager' ) );
+						api.error( ( error && error.message ) || __( 'The appearance could not be saved.', 'fena-media-manager' ) );
 					} );
 				}
 			} );
@@ -1470,7 +1565,7 @@
 		 * @param {string}   config.id       Combobox id.
 		 * @param {string}   config.labelId  Id of the label element.
 		 * @param {string}   config.listId   Listbox id.
-		 * @param {Object[]} config.options  { value, label, depth, color, path }.
+		 * @param {Object[]} config.options  { value, label, depth, color, icon, path }.
 		 * @param {string}   config.value    Initially selected value.
 		 * @return {Object} { $el, value(), focus() }.
 		 */
@@ -1508,7 +1603,7 @@
 			function syncButton() {
 				var option = options[ indexOfValue( value ) ];
 
-				$buttonIcon.empty().append( iconEl( 'folder' ) ).toggleClass( 'fmm-picker__icon--plain', '0' === option.value );
+				$buttonIcon.empty().append( folderIconEls( option.icon ) ).toggleClass( 'fmm-picker__icon--plain', '0' === option.value );
 				markColor( $buttonIcon, option.color );
 				$buttonLabel.text( option.label );
 				$button.attr( 'data-value', option.value );
@@ -1592,7 +1687,7 @@
 			}
 
 			_.each( options, function( option, i ) {
-				var $icon = $( '<span class="fmm-picker__icon" aria-hidden="true"></span>' ).append( iconEl( 'folder' ) ).toggleClass( 'fmm-picker__icon--plain', '0' === option.value );
+				var $icon = $( '<span class="fmm-picker__icon" aria-hidden="true"></span>' ).append( folderIconEls( option.icon ) ).toggleClass( 'fmm-picker__icon--plain', '0' === option.value );
 				var $li = $( '<li class="fmm-picker__option" role="option"></li>' ).attr( { id: config.listId + '-opt-' + option.value, 'data-value': option.value, 'aria-selected': 'false' } )
 					.css( 'padding-inline-start', ( 10 + option.depth * 16 ) + 'px' )
 					.append( $icon, $( '<span class="fmm-picker__name"></span>' ).text( option.label ), iconEl( 'check' ) );
@@ -1712,6 +1807,7 @@
 						label: other.folder.name,
 						depth: other.depth + 1,
 						color: other.folder.color || '',
+						icon: other.folder.icon || '',
 						path: _.map( other.parents, function( parent ) {
 							return ( store.get( parent ) || {} ).name;
 						} ).join( ' › ' )
@@ -1894,7 +1990,7 @@
 		row: function( value, name, count, iconName, isFolder, ctx, node ) {
 			var li = templates().li.cloneNode( false );
 			var active = value === ctx.current;
-			var folder, countEl;
+			var folder, countEl, glyph;
 
 			li.setAttribute( 'data-folder', value );
 			if ( active ) {
@@ -1920,12 +2016,16 @@
 			}
 
 			folder = templates().folder.cloneNode( true );
+			glyph = isFolder && 'folder' === iconName && node && _.contains( FOLDER_ICONS, node.folder.icon ) ? node.folder.icon : '';
 			folder.insertBefore( iconEl( iconName ), folder.firstChild );
+			if ( glyph ) {
+				folder.insertBefore( glyphEl( glyph ), folder.firstChild.nextSibling );
+			}
 			if ( active && isFolder && 'folder' === iconName ) {
 				folder.firstChild.firstChild.setAttribute( 'href', '#fmm-i-folder-open' );
 			}
 			folder.setAttribute( 'data-fmm-key', 'folder-' + value );
-			this.fillName( folder.childNodes[ 1 ], name, isFolder );
+			this.fillName( folder.childNodes[ glyph ? 2 : 1 ], name, isFolder );
 			countEl = folder.lastChild;
 			countEl.textContent = count;
 			countEl.setAttribute( 'aria-label', countLabel( count ) );
@@ -2154,7 +2254,7 @@
 
 			if ( window.HTMLDialogElement && HTMLDialogElement.prototype.showModal ) {
 				items.push( { className: 'fmm-folder-moveto', icon: 'move-to', key: 'moveto-' + id, label: __( 'Move to…', 'fena-media-manager' ) } );
-				items.push( { className: 'fmm-folder-color', icon: 'color', key: 'color-' + id, label: __( 'Color…', 'fena-media-manager' ) } );
+				items.push( { className: 'fmm-folder-color', icon: 'color', key: 'color-' + id, label: __( 'Appearance…', 'fena-media-manager' ) } );
 			}
 
 			if ( manual && index > 0 ) {
