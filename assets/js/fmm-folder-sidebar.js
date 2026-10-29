@@ -1330,9 +1330,9 @@
 				self.expandTo( target );
 				self.notice( destination ?
 					/* translators: 1: folder name, 2: destination folder name. */
-					sprintf( __( 'Folder “%1$s” moved to “%2$s”.', 'fena-media-manager' ), folder.name, destination.name ) :
+					sprintf( __( 'Moved “%1$s” to “%2$s”.', 'fena-media-manager' ), folder.name, destination.name ) :
 					/* translators: %s: folder name. */
-					sprintf( __( 'Folder “%s” moved to the top level.', 'fena-media-manager' ), folder.name ), 'success' );
+					sprintf( __( 'Moved “%s” to top level.', 'fena-media-manager' ), folder.name ), 'success' );
 
 				return store.refresh().then( function() {
 					self.focusKey( 'folder-' + id );

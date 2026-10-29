@@ -264,10 +264,10 @@
 }
 
 .fmm .fmm-notice-ui.notice p {
-	flex: 1 1 auto;
+	flex: 1 1 0%; /* Long texts wrap inside the row instead of pushing the text and the close button to new lines. */
 	min-width: 0;
 	margin: 0;
-	padding: 0;
+	padding: 1px 0 0;
 	color: var(--fmm-text-body);
 	font-size: 13px;
 	line-height: 1.5;

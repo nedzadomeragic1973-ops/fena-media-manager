@@ -185,6 +185,62 @@ class FMM_Settings {
 	}
 
 	/**
+	 * Validated donation link: a https://paypal.me/<name> URL from the
+	 * `fmm_donate_url` filter, otherwise ''.
+	 *
+	 * @return string URL or ''.
+	 */
+	public static function donate_url() {
+		$url = apply_filters( 'fmm_donate_url', 'https://www.paypal.me/nedzadomeragic' );
+
+		if ( ! is_string( $url ) || '' === $url || ! wp_http_validate_url( $url ) ) {
+			return '';
+		}
+
+		$parts = wp_parse_url( $url );
+		$host  = isset( $parts['host'] ) ? strtolower( $parts['host'] ) : '';
+		$path  = isset( $parts['path'] ) ? trim( $parts['path'], '/' ) : '';
+
+		if ( ! isset( $parts['scheme'] ) || 'https' !== strtolower( $parts['scheme'] ) || ! in_array( $host, array( 'paypal.me', 'www.paypal.me' ), true ) || '' === $path ) {
+			return '';
+		}
+
+		return $url;
+	}
+
+	/**
+	 * Renders the donation card. Outside the settings form; no URL = disabled button.
+	 */
+	private static function render_donate_card() {
+		$url = self::donate_url();
+		?>
+		<section class="fmm-card fmm-donate" aria-labelledby="fmm-settings-donate">
+			<h2 id="fmm-settings-donate">
+				<svg class="fmm-icon fmm-donate__heading-icon" aria-hidden="true" focusable="false"><use href="#fmm-i-heart"></use></svg>
+				<?php esc_html_e( 'Support Fena Media Manager', 'fena-media-manager' ); ?>
+			</h2>
+			<p><?php esc_html_e( 'Fena Media Manager is free to use. If you enjoy the plugin, you can support its continued development with a voluntary donation.', 'fena-media-manager' ); ?></p>
+			<div class="fmm-donate__row">
+				<?php if ( '' !== $url ) : ?>
+					<a class="button button-primary fmm-donate__button" href="<?php echo esc_url( $url ); ?>" target="_blank" rel="noopener noreferrer">
+						<svg class="fmm-icon" aria-hidden="true" focusable="false"><use href="#fmm-i-heart"></use></svg>
+						<span><?php esc_html_e( 'Donate via PayPal', 'fena-media-manager' ); ?><span class="screen-reader-text"> <?php esc_html_e( '(opens in a new tab)', 'fena-media-manager' ); ?></span></span>
+						<svg class="fmm-icon fmm-donate__external" aria-hidden="true" focusable="false"><use href="#fmm-i-arrow-top-right-on-square"></use></svg>
+					</a>
+				<?php else : ?>
+					<button type="button" class="fmm-donate__button" disabled aria-disabled="true">
+						<svg class="fmm-icon" aria-hidden="true" focusable="false"><use href="#fmm-i-heart"></use></svg>
+						<span><?php esc_html_e( 'Donate via PayPal', 'fena-media-manager' ); ?></span>
+						<svg class="fmm-icon fmm-donate__external" aria-hidden="true" focusable="false"><use href="#fmm-i-arrow-top-right-on-square"></use></svg>
+					</button>
+				<?php endif; ?>
+				<span class="fmm-donate__note"><?php esc_html_e( 'Optional support. All features remain free.', 'fena-media-manager' ); ?></span>
+			</div>
+		</section>
+		<?php
+	}
+
+	/**
 	 * Sort mode labels (same as the folder sidebar).
 	 *
 	 * @return string[]
@@ -282,6 +338,7 @@ class FMM_Settings {
 				</section>
 			</form>
 			<?php FMM_Transfer::render_section(); ?>
+			<?php self::render_donate_card(); ?>
 		</div>
 		<?php
 	}
