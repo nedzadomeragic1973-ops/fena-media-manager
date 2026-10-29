@@ -37,6 +37,7 @@ class FMM_Settings {
 		add_action( 'admin_menu', array( __CLASS__, 'add_page' ) );
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue' ) );
 		add_filter( 'plugin_action_links_' . plugin_basename( FMM_FILE ), array( __CLASS__, 'action_links' ) );
+		add_filter( 'plugin_row_meta', array( __CLASS__, 'row_meta' ), 10, 2 );
 	}
 
 	/**
@@ -182,6 +183,21 @@ class FMM_Settings {
 		}
 
 		return $links;
+	}
+
+	/**
+	 * Adds the "Support" e-mail link below the plugin description on the plugins screen.
+	 *
+	 * @param string[] $meta Row meta links.
+	 * @param string   $file Plugin file relative to the plugins directory.
+	 * @return string[]
+	 */
+	public static function row_meta( $meta, $file ) {
+		if ( plugin_basename( FMM_FILE ) === $file ) {
+			$meta[] = sprintf( '<a href="%s">%s</a>', esc_url( 'mailto:omeragicnedzad@icloud.com' ), esc_html__( 'Support', 'fena-media-manager' ) );
+		}
+
+		return $meta;
 	}
 
 	/**
