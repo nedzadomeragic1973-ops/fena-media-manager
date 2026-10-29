@@ -71,6 +71,7 @@
 
 .fmm-settings .fmm-choice {
 	display: block;
+	min-height: 24px;
 	margin: 0 0 6px;
 	font-size: 13px;
 	line-height: 1.6;

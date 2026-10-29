@@ -173,7 +173,7 @@
 	font-size: 13px;
 	line-height: 1.5;
 	background: var(--fmm-surface);
-	border: 1px solid var(--fmm-border);
+	border: 1px solid var(--fmm-border-input);
 	border-radius: var(--fmm-radius-control);
 	box-shadow: none;
 }
@@ -183,7 +183,7 @@
 }
 
 .fmm-search .fmm-search__input:hover {
-	border-color: var(--fmm-border-strong);
+	border-color: var(--fmm-text-muted);
 }
 
 .fmm-search .fmm-search__input:focus {
@@ -287,7 +287,8 @@
 	width: 100%;
 	height: 32px;
 	margin: 0;
-	padding: 0 10px;
+	padding-block: 0;
+	padding-inline: 8px 10px;
 	color: var(--fmm-text-body);
 	font-size: 13px;
 	line-height: 1;
@@ -295,6 +296,7 @@
 	white-space: nowrap;
 	background: transparent;
 	border: 0;
+	border-inline-start: 2px solid transparent;
 	border-radius: var(--fmm-radius-small);
 	cursor: pointer;
 }
@@ -325,7 +327,8 @@
 
 .fmm-sort .fmm-sort__item:focus-visible {
 	background: var(--fmm-accent-soft);
-	outline: var(--fmm-focus-width) solid var(--fmm-focus);
+	border-inline-start-color: var(--fmm-accent);
+	outline: 2px solid transparent;
 	outline-offset: -2px;
 }
 
@@ -359,7 +362,7 @@
 	padding-inline-start: calc(var(--fmm-depth, 0) * 16px);
 }
 
-/* Leaf rows have no chevron button: pad by its width (20px + 4px margin) while the tree has any. */
+/* Leaf rows have no chevron button: pad by its width (24px) while the tree has any. */
 .fmm-sidebar.has-tree .fmm-sidebar__item--leaf {
 	padding-inline-start: calc(var(--fmm-depth, 0) * 16px + 24px);
 }
@@ -369,9 +372,9 @@
 	flex: none;
 	align-items: center;
 	justify-content: center;
-	width: 20px;
+	width: 24px;
 	height: 24px;
-	margin-inline-start: 4px;
+	margin-inline-start: 0;
 	padding: 0;
 	color: var(--fmm-text-muted);
 	background: none;
@@ -409,7 +412,7 @@
 }
 
 .fmm-sidebar.has-tree .fmm-folder {
-	padding-inline-start: 2px;
+	padding-inline-start: 0;
 }
 
 .fmm-folder {
@@ -419,13 +422,14 @@
 	gap: 8px;
 	min-width: 0;
 	padding-block: 7px;
-	padding-inline: 10px 6px;
+	padding-inline: 8px 6px;
 	color: var(--fmm-text-body);
 	font-size: 13px;
 	line-height: 20px;
 	text-align: start;
 	background: none;
 	border: 0;
+	border-inline-start: 2px solid transparent;
 	border-radius: var(--fmm-radius-control);
 	cursor: pointer;
 }
@@ -441,7 +445,9 @@
 }
 
 .fmm-folder:focus-visible {
-	outline: var(--fmm-focus-width) solid var(--fmm-focus);
+	background: var(--fmm-accent-soft);
+	border-inline-start-color: var(--fmm-accent);
+	outline: 2px solid transparent;
 	outline-offset: -2px;
 	box-shadow: none;
 }
@@ -636,13 +642,15 @@
 	width: 100%;
 	height: 32px;
 	margin: 0;
-	padding: 0 10px;
+	padding-block: 0;
+	padding-inline: 8px 10px;
 	color: var(--fmm-text-body);
 	font-size: 13px;
 	line-height: 1;
 	text-align: start;
 	background: none;
 	border: 0;
+	border-inline-start: 2px solid transparent;
 	border-radius: var(--fmm-radius-small);
 	cursor: pointer;
 }
@@ -658,7 +666,8 @@
 
 .fmm-sidebar .fmm-menu__item:focus-visible {
 	background: var(--fmm-accent-soft);
-	outline: var(--fmm-focus-width) solid var(--fmm-focus);
+	border-inline-start-color: var(--fmm-accent);
+	outline: 2px solid transparent;
 	outline-offset: -2px;
 	box-shadow: none;
 }
@@ -698,6 +707,10 @@
 .fmm-sidebar .fmm-menu .fmm-folder-delete:focus-visible {
 	color: var(--fmm-danger);
 	background: var(--fmm-danger-soft);
+}
+
+.fmm-sidebar .fmm-menu .fmm-folder-delete:focus-visible {
+	border-inline-start-color: var(--fmm-danger);
 }
 
 .fmm-sidebar__selection {
@@ -864,7 +877,7 @@
 	font-size: 13px;
 	line-height: 1.4;
 	background-color: var(--fmm-surface);
-	border: 1px solid var(--fmm-border);
+	border: 1px solid var(--fmm-border-input);
 	border-radius: var(--fmm-radius-control);
 	box-shadow: none;
 }
@@ -880,7 +893,7 @@
 
 .fmm-dialog .fmm-dialog__field select:hover,
 .fmm-dialog .fmm-dialog__field input[type="text"]:hover {
-	border-color: var(--fmm-border-strong);
+	border-color: var(--fmm-text-muted);
 }
 
 .fmm-dialog .fmm-dialog__field select:focus,
@@ -1264,13 +1277,13 @@
 	color: var(--fmm-text);
 	font-size: 13px;
 	background: var(--fmm-surface);
-	border: 1px solid var(--fmm-border);
+	border: 1px solid var(--fmm-border-input);
 	border-radius: var(--fmm-radius-control);
 	box-shadow: none;
 }
 
 .fmm-form .fmm-form__input:hover {
-	border-color: var(--fmm-border-strong);
+	border-color: var(--fmm-text-muted);
 }
 
 .fmm-form__buttons {
@@ -1336,6 +1349,10 @@ select#media-attachment-filters ~ select#fmm-attachment-folder-filter {
 	}
 
 	.fmm-sidebar .fmm-menu__item {
+		height: 40px;
+	}
+
+	.fmm-folder-toggle {
 		height: 40px;
 	}
 

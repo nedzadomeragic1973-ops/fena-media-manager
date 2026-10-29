@@ -15,6 +15,7 @@
 	/* Borders */
 	--fmm-border: #e2e8f0;
 	--fmm-border-strong: #cbd5e1;
+	--fmm-border-input: #8392a8; /* form field borders: 3.16:1 on white, 3.02:1 on --fmm-surface-subtle */
 
 	/* Text */
 	--fmm-text: #0f172a;

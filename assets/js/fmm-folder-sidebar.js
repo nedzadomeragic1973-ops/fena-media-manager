@@ -2110,6 +2110,8 @@
 			var open = this.menuOpen === id;
 			var button = this.actionButton( 'fmm-folder-menu-toggle', 'more', 'menu-' + id, sprintf( strings().more, name ) );
 
+			button.id = 'fmm-folder-menu-toggle-' + id;
+			button.setAttribute( 'aria-haspopup', 'menu' );
 			button.setAttribute( 'aria-expanded', String( open ) );
 			if ( open ) {
 				button.setAttribute( 'aria-controls', 'fmm-folder-menu-' + id );
@@ -2164,8 +2166,8 @@
 				items.push( { className: 'fmm-folder-delete', icon: 'delete', key: 'delete-' + id, label: __( 'Delete', 'fena-media-manager' ) } );
 			}
 
-			return $( '<div class="fmm-menu"></div>' ).attr( 'id', 'fmm-folder-menu-' + id ).append( _.map( items, function( item ) {
-				return $( '<button type="button" class="fmm-menu__item"></button>' )
+			return $( '<div class="fmm-menu" role="menu"></div>' ).attr( { id: 'fmm-folder-menu-' + id, 'aria-labelledby': 'fmm-folder-menu-toggle-' + id } ).append( _.map( items, function( item ) {
+				return $( '<button type="button" class="fmm-menu__item" role="menuitem"></button>' )
 					.addClass( item.className )
 					.attr( 'data-fmm-key', item.key )
 					.append( icon( item.icon ), $( '<span></span>' ).text( item.label ) );
@@ -2563,8 +2565,7 @@
 		notice: function( message, type ) {
 			var $notice = this.$el.find( '.fmm-sidebar__notice' );
 			type = type || 'error';
-			$notice.removeClass( 'notice-success notice-warning notice-error' ).addClass( 'notice-' + type )
-				.attr( 'role', 'error' === type ? 'alert' : 'status' );
+			$notice.removeClass( 'notice-success notice-warning notice-error' ).addClass( 'notice-' + type );
 			$notice.find( 'p' ).text( message );
 			$notice.find( '.fmm-notice-ui__icon' ).empty().append( icon( 'notice-' + type ) );
 			$notice.prop( 'hidden', ! message );
