@@ -56,7 +56,13 @@
 		'delete': 'trash',
 		search: 'magnifying-glass',
 		sort: 'bars-arrow-down',
-		check: 'check'
+		check: 'check',
+		lock: 'lock-closed',
+		unlock: 'lock-open',
+		'notice-success': 'check-circle',
+		'notice-warning': 'exclamation-triangle',
+		'notice-error': 'exclamation-circle',
+		dismiss: 'x-mark'
 	};
 
 	var SVG_NS = 'http://www.w3.org/2000/svg';
@@ -321,8 +327,10 @@
 			),
 			$( '<div class="fmm-sidebar__toolbar"></div>' ).append( this.searchControl(), this.sortControl() ),
 			$( '<div class="fmm-sidebar__notice notice inline is-dismissible" hidden></div>' ).append(
+				'<span class="fmm-sidebar__notice-icon" aria-hidden="true"></span>',
 				'<p></p>',
 				$( '<button type="button" class="notice-dismiss"></button>' ).append(
+					icon( 'dismiss' ),
 					$( '<span class="screen-reader-text"></span>' ).text( __( 'Dismiss this notice.', 'fena-media-manager' ) )
 				)
 			),
@@ -966,6 +974,10 @@
 				self.startEdit( rowValue( this ) );
 			} );
 
+			this.$el.on( 'click', '.fmm-folder-lock, .fmm-folder-unlock', function() {
+				self.setLocked( rowValue( this ), $( this ).hasClass( 'fmm-folder-lock' ) );
+			} );
+
 			this.$el.on( 'click', '.fmm-folder-delete', function() {
 				self.remove( rowValue( this ) );
 			} );
@@ -1138,6 +1150,15 @@
 		 * @param {Event} event Drag event.
 		 * @return {Object|null} { $row, id, position: 'before'|'after'|'into' } or null.
 		 */
+		// Whether the folders below a parent ('0' = top level) cannot be reordered: the parent is protected or a sibling is locked.
+		levelLocked: function( parentId ) {
+			var parent = '0' === parentId ? null : this.node( parentId );
+
+			return !! ( parent && parent.protected ) || _.some( store.tree(), function( node ) {
+				return node.folder.locked && ( node.parents.length ? node.parents[ node.parents.length - 1 ] : '0' ) === parentId;
+			} );
+		},
+
 		folderDropTarget: function( event ) {
 			var $row = $( event.target ).closest( '.fmm-sidebar__item--folder' );
 			var dragged = this.node( this.dragFolder );
@@ -1156,8 +1177,11 @@
 			ratio = ( event.clientY - rect.top ) / rect.height;
 
 			if ( 'manual' === store.sort && this.parentOf( target ) === this.parentOf( dragged ) && ( ratio < 0.25 || ratio > 0.75 ) ) {
+				if ( this.levelLocked( this.parentOf( target ) ) ) {
+					return null;
+				}
 				position = ratio < 0.25 ? 'before' : 'after';
-			} else if ( ! _.contains( target.parents, this.dragFolder ) && String( target.folder.id ) !== this.parentOf( dragged ) ) {
+			} else if ( ! target.protected && ! _.contains( target.parents, this.dragFolder ) && String( target.folder.id ) !== this.parentOf( dragged ) ) {
 				position = 'into';
 			} else {
 				return null;
@@ -1801,7 +1825,7 @@
 			current = this.parentOf( node );
 			pickerOptions = [ { value: '0', label: __( 'Top level', 'fena-media-manager' ), depth: 0, color: '', path: '' } ];
 			_.each( store.tree(), function( other ) {
-				if ( String( other.folder.id ) !== id && ! _.contains( other.parents, id ) ) {
+				if ( String( other.folder.id ) !== id && ! _.contains( other.parents, id ) && ! other.protected ) {
 					pickerOptions.push( {
 						value: String( other.folder.id ),
 						label: other.folder.name,
@@ -1990,7 +2014,7 @@
 		row: function( value, name, count, iconName, isFolder, ctx, node ) {
 			var li = templates().li.cloneNode( false );
 			var active = value === ctx.current;
-			var folder, countEl, glyph;
+			var folder, countEl, glyph, lock;
 
 			li.setAttribute( 'data-folder', value );
 			if ( active ) {
@@ -2026,13 +2050,19 @@
 			}
 			folder.setAttribute( 'data-fmm-key', 'folder-' + value );
 			this.fillName( folder.childNodes[ glyph ? 2 : 1 ], name, isFolder );
+			if ( node && node.folder.locked ) {
+				lock = iconEl( 'lock' );
+				lock.setAttribute( 'class', lock.getAttribute( 'class' ) + ' fmm-folder__lock' );
+				folder.insertBefore( lock, folder.lastChild );
+				folder.insertBefore( $( '<span class="screen-reader-text"></span>' ).text( __( 'Locked', 'fena-media-manager' ) )[ 0 ], folder.lastChild );
+			}
 			countEl = folder.lastChild;
 			countEl.textContent = count;
 			countEl.setAttribute( 'aria-label', countLabel( count ) );
 			if ( active ) {
 				folder.setAttribute( 'aria-current', 'true' );
 			}
-			if ( isFolder && this.canDrag( ctx ) ) {
+			if ( isFolder && this.canDrag( ctx ) && this.movable( node ) ) {
 				folder.setAttribute( 'draggable', 'true' );
 			}
 			if ( node && _.contains( COLOR_PRESETS, node.folder.color ) ) {
@@ -2048,6 +2078,11 @@
 			}
 
 			return li;
+		},
+
+		// Folders that are locked, inside a locked folder, or hold a locked folder keep their place.
+		movable: function( node ) {
+			return !! node && ! node.protected && ! node.lockedBelow;
 		},
 
 		canDrag: function( ctx ) {
@@ -2137,8 +2172,11 @@
 
 		buildActions: function( value, name ) {
 			var actions = templates().actions.cloneNode( false );
+			var node = this.node( value );
 
-			actions.appendChild( this.actionButton( 'fmm-folder-subfolder', 'subfolder', 'subfolder-' + value, sprintf( strings().subfolder, name ) ) );
+			if ( ! node || ! node.protected ) {
+				actions.appendChild( this.actionButton( 'fmm-folder-subfolder', 'subfolder', 'subfolder-' + value, sprintf( strings().subfolder, name ) ) );
+			}
 			actions.appendChild( this.menuToggle( value, name ) );
 
 			return actions;
@@ -2250,20 +2288,40 @@
 			var info = this.siblings( id );
 			var index = info ? _.indexOf( info.ids, id ) : -1;
 			var manual = 'manual' === store.sort && ! this.query;
-			var items = [ { className: 'fmm-folder-rename', icon: 'rename', key: 'rename-' + id, label: __( 'Rename', 'fena-media-manager' ) } ];
+			var node = this.node( id );
+			var dialogs = window.HTMLDialogElement && HTMLDialogElement.prototype.showModal;
+			var locked = !! ( node && node.folder.locked );
+			var protectedNode = !! ( node && node.protected );
+			var below = !! ( node && node.lockedBelow );
+			var items = [];
+			var partner = function( delta ) {
+				var other = info && info.ids[ index + delta ] ? self.node( info.ids[ index + delta ] ) : null;
+				return other && other.folder.locked;
+			};
+			var self = this;
+			var lockItem = locked ?
+				{ className: 'fmm-folder-unlock', icon: 'unlock', key: 'unlock-' + id, label: __( 'Unlock folder', 'fena-media-manager' ) } :
+				{ className: 'fmm-folder-lock', icon: 'lock', key: 'lock-' + id, label: __( 'Lock folder', 'fena-media-manager' ) };
 
-			if ( window.HTMLDialogElement && HTMLDialogElement.prototype.showModal ) {
-				items.push( { className: 'fmm-folder-moveto', icon: 'move-to', key: 'moveto-' + id, label: __( 'Move to…', 'fena-media-manager' ) } );
+			if ( ! protectedNode ) {
+				items.push( { className: 'fmm-folder-rename', icon: 'rename', key: 'rename-' + id, label: __( 'Rename', 'fena-media-manager' ) } );
+				if ( dialogs && ! below ) {
+					items.push( { className: 'fmm-folder-moveto', icon: 'move-to', key: 'moveto-' + id, label: __( 'Move to…', 'fena-media-manager' ) } );
+				}
+			}
+			if ( dialogs ) {
 				items.push( { className: 'fmm-folder-color', icon: 'color', key: 'color-' + id, label: __( 'Appearance…', 'fena-media-manager' ) } );
 			}
-
-			if ( manual && index > 0 ) {
+			if ( ! protectedNode && manual && index > 0 && ! partner( -1 ) ) {
 				items.push( { className: 'fmm-folder-up', icon: 'move-up', key: 'up-' + id, label: __( 'Move up', 'fena-media-manager' ) } );
 			}
-			if ( manual && index >= 0 && index < info.ids.length - 1 ) {
+			if ( ! protectedNode && manual && index >= 0 && index < info.ids.length - 1 && ! partner( 1 ) ) {
 				items.push( { className: 'fmm-folder-down', icon: 'move-down', key: 'down-' + id, label: __( 'Move down', 'fena-media-manager' ) } );
 			}
-			items.push( { className: 'fmm-folder-delete', icon: 'delete', key: 'delete-' + id, label: __( 'Delete', 'fena-media-manager' ) } );
+			items.push( lockItem );
+			if ( ! protectedNode && ! below ) {
+				items.push( { className: 'fmm-folder-delete', icon: 'delete', key: 'delete-' + id, label: __( 'Delete', 'fena-media-manager' ) } );
+			}
 
 			return $( '<div class="fmm-menu"></div>' ).attr( 'id', 'fmm-folder-menu-' + id ).append( _.map( items, function( item ) {
 				return $( '<button type="button" class="fmm-menu__item"></button>' )
@@ -2584,7 +2642,7 @@
 					}
 				}
 				li.classList.remove( 'has-assign', 'is-menu-open' );
-				if ( self.canDrag( ctx ) ) {
+				if ( self.canDrag( ctx ) && self.movable( self.node( value ) ) ) {
 					button.setAttribute( 'draggable', 'true' );
 				} else {
 					button.removeAttribute( 'draggable' );
@@ -2625,6 +2683,12 @@
 		 * @param {string} [parent] Parent folder ID for a new subfolder.
 		 */
 		startEdit: function( id, parent ) {
+			var guard = this.node( 'new' === id ? parent : id );
+
+			// A locked folder neither gets renamed nor receives subfolders.
+			if ( guard && guard.protected ) {
+				return;
+			}
 			this.closeSort( false );
 			this.editing = id;
 			this.menuOpen = null;
@@ -2661,6 +2725,7 @@
 			$notice.removeClass( 'notice-success notice-warning notice-error' ).addClass( 'notice-' + type )
 				.attr( 'role', 'error' === type ? 'alert' : 'status' );
 			$notice.find( 'p' ).text( message );
+			$notice.find( '.fmm-sidebar__notice-icon' ).empty().append( icon( 'notice-' + type ) );
 			$notice.prop( 'hidden', ! message );
 			if ( message && wp.a11y ) {
 				wp.a11y.speak( message, 'error' === type ? 'assertive' : 'polite' );
@@ -2705,6 +2770,37 @@
 					sprintf( __( 'Folder renamed to “%s”.', 'fena-media-manager' ), folder.name ), 'success' );
 				return store.refresh().then( function() {
 					self.focusKey( 'folder-' + folder.id );
+				} );
+			} ).catch( function( error ) {
+				self.fail( error );
+			} );
+		},
+
+		/**
+		 * Locks or unlocks a folder.
+		 *
+		 * @param {string}  id     Folder ID.
+		 * @param {boolean} locked Whether to lock.
+		 */
+		setLocked: function( id, locked ) {
+			var self = this;
+			var folder = store.get( id );
+
+			if ( ! folder || this.busy ) {
+				return;
+			}
+
+			this.menuOpen = null;
+			this.busy = true;
+			wp.apiFetch( { path: '/fmm/v1/folders/' + id, method: 'PATCH', data: { locked: locked } } ).then( function() {
+				self.busy = false;
+				self.notice( locked ?
+					/* translators: %s: folder name. */
+					sprintf( __( 'Folder “%s” locked.', 'fena-media-manager' ), folder.name ) :
+					/* translators: %s: folder name. */
+					sprintf( __( 'Folder “%s” unlocked.', 'fena-media-manager' ), folder.name ), 'success' );
+				return store.refresh().then( function() {
+					self.focusKey( 'folder-' + id );
 				} );
 			} ).catch( function( error ) {
 				self.fail( error );

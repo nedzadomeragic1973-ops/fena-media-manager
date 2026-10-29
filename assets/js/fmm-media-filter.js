@@ -119,6 +119,19 @@
 				} );
 			}( '0', 0, [] ) );
 
+			// Folder Lock, derived once per tree: protected = locked or inside a locked folder; lockedBelow = a locked folder in the subtree.
+			_.each( list, function( node ) {
+				var parent = node.parents.length ? nodes[ node.parents[ node.parents.length - 1 ] ] : null;
+				node.protected = !! node.folder.locked || !! ( parent && parent.protected );
+				node.lockedBelow = false;
+			} );
+			_.each( list.slice().reverse(), function( node ) {
+				var parent = node.parents.length ? nodes[ node.parents[ node.parents.length - 1 ] ] : null;
+				if ( parent && ( node.folder.locked || node.lockedBelow ) ) {
+					parent.lockedBelow = true;
+				}
+			} );
+
 			this.nodes = nodes;
 			this.cachedTree = list;
 

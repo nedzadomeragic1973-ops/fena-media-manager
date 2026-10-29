@@ -626,7 +626,15 @@ class FMM_Transfer {
 				}
 			}
 
+			// Nothing is added below a locked folder.
+			$locked = false;
+			if ( 'new' === $status && $parent_id && FMM_Taxonomy::is_protected( $parent_id ) ) {
+				$status = 'skip';
+				$locked = true;
+			}
+
 			$planned             = $node;
+			$planned['locked']   = $locked;
 			$planned['status']   = $status;
 			$planned['id']       = $id;
 			$planned['children'] = self::plan( $node['children'], $strategy, $existing, $id, 'merge' === $status ? '' : $status );
@@ -886,6 +894,13 @@ class FMM_Transfer {
 			$here  = $path . '[' . $position . ']';
 			$lower = mb_strtolower( $node['name'] );
 			$id    = isset( $index['kids'][ $parent_id ][ $lower ] ) ? $index['kids'][ $parent_id ][ $lower ] : 0;
+
+			if ( ! $id && $parent_id && FMM_Taxonomy::is_protected( $parent_id ) ) {
+				// Re-checked here: the plan may be older than the request.
+				$summary['skipped'] += 1 + self::count_nodes( $node['children'] );
+				self::note_failure( $summary, $here, __( 'Not created: the parent folder is locked.', 'fena-media-manager' ) );
+				continue;
+			}
 
 			if ( ! $id ) {
 				// One transaction per folder: if the request dies between the insert and the meta writes, MySQL rolls the folder back.
@@ -1276,6 +1291,9 @@ class FMM_Transfer {
 			}
 			echo '<span class="fmm-badge fmm-badge--' . esc_attr( $node['status'] ) . '" data-view="merge">' . esc_html( $labels[ $node['status'] ] ) . '</span>';
 			echo '<span class="fmm-badge fmm-badge--' . esc_attr( $other['status'] ) . '" data-view="skip" hidden>' . esc_html( $labels[ $other['status'] ] ) . '</span>';
+			if ( ! empty( $node['locked'] ) ) {
+				echo ' <span class="fmm-tree__icon">' . esc_html__( '· Locked folder: nothing is added below it.', 'fena-media-manager' ) . '</span>';
+			}
 			echo '</span>';
 			if ( $node['children'] ) {
 				self::render_plan( $node['children'], $other['children'] );

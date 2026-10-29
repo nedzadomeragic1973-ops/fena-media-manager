@@ -48,7 +48,13 @@ class FMM_Taxonomy {
 	const ICON_META = 'fmm_icon';
 
 	/**
-	 * Folder icons: glyphs drawn on the folder (see FMM_Icons::GLYPHS).
+	 * Term meta key of the folder lock ('1' = locked). Unlocked stores nothing.
+	 * A lock protects the structure (rename, move, delete, subfolders), not access.
+	 */
+	const LOCK_META = 'fmm_locked';
+
+	/**
+	 * Folder icons: glyphs shown next to the folder icon (see FMM_Icons::GLYPHS).
 	 */
 	const ICONS = array( 'image', 'video', 'document', 'audio', 'archive', 'star', 'people', 'tag' );
 
@@ -56,6 +62,13 @@ class FMM_Taxonomy {
 	 * Available folder sort modes.
 	 */
 	const SORT_MODES = array( 'name_asc', 'name_desc', 'newest', 'oldest', 'manual' );
+
+	/**
+	 * Cached IDs of the locked folders.
+	 *
+	 * @var int[]|null
+	 */
+	private static $locked_cache = null;
 
 	/**
 	 * Registers the taxonomy.
@@ -121,6 +134,17 @@ class FMM_Taxonomy {
 
 		register_term_meta(
 			self::NAME,
+			self::LOCK_META,
+			array(
+				'type'              => 'string',
+				'single'            => true,
+				'sanitize_callback' => array( __CLASS__, 'sanitize_lock' ),
+				'show_in_rest'      => false,
+			)
+		);
+
+		register_term_meta(
+			self::NAME,
 			self::ICON_META,
 			array(
 				'type'              => 'string',
@@ -129,6 +153,82 @@ class FMM_Taxonomy {
 				'show_in_rest'      => false,
 			)
 		);
+	}
+
+	/**
+	 * Sanitizes the lock flag.
+	 *
+	 * @param mixed $raw Raw value.
+	 * @return string '1' or ''.
+	 */
+	public static function sanitize_lock( $raw ) {
+		return '1' === (string) $raw ? '1' : '';
+	}
+
+	/**
+	 * IDs of all locked folders (one query per request, see reset_lock_cache()).
+	 *
+	 * @return int[]
+	 */
+	public static function locked_ids() {
+		global $wpdb;
+
+		if ( null === self::$locked_cache ) {
+			self::$locked_cache = array_map(
+				'intval',
+				$wpdb->get_col( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- One lookup per request, reset on lock changes.
+					$wpdb->prepare(
+						"SELECT tm.term_id FROM {$wpdb->termmeta} tm INNER JOIN {$wpdb->term_taxonomy} tt ON tt.term_id = tm.term_id WHERE tm.meta_key = %s AND tm.meta_value = '1' AND tt.taxonomy = %s",
+						self::LOCK_META,
+						self::NAME
+					)
+				)
+			);
+		}
+
+		return self::$locked_cache;
+	}
+
+	/**
+	 * Forgets the cached lock list.
+	 */
+	public static function reset_lock_cache() {
+		self::$locked_cache = null;
+	}
+
+	/**
+	 * Whether a folder is locked or has a locked ancestor.
+	 *
+	 * @param int $id Folder ID.
+	 * @return bool
+	 */
+	public static function is_protected( $id ) {
+		$id     = (int) $id;
+		$locked = self::locked_ids();
+
+		if ( ! $id || ! $locked ) {
+			return false;
+		}
+
+		return in_array( $id, $locked, true ) || (bool) array_intersect( $locked, array_map( 'intval', get_ancestors( $id, self::NAME, 'taxonomy' ) ) );
+	}
+
+	/**
+	 * Whether a folder has a locked folder somewhere below it.
+	 *
+	 * @param int $id Folder ID.
+	 * @return bool
+	 */
+	public static function has_locked_descendant( $id ) {
+		$id = (int) $id;
+
+		foreach ( self::locked_ids() as $locked_id ) {
+			if ( $locked_id !== $id && in_array( $id, array_map( 'intval', get_ancestors( $locked_id, self::NAME, 'taxonomy' ) ), true ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**
@@ -426,6 +526,7 @@ class FMM_Taxonomy {
 			'order'  => (int) get_term_meta( $term->term_id, self::ORDER_META, true ),
 			'color'  => self::sanitize_color( get_term_meta( $term->term_id, self::COLOR_META, true ) ),
 			'icon'   => self::sanitize_icon( get_term_meta( $term->term_id, self::ICON_META, true ) ),
+			'locked' => '1' === self::sanitize_lock( get_term_meta( $term->term_id, self::LOCK_META, true ) ),
 		);
 	}
 

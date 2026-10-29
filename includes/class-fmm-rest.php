@@ -81,6 +81,7 @@ class FMM_REST {
 						),
 						'color'  => array( 'type' => 'string' ),
 						'icon'   => array( 'type' => 'string' ),
+						'locked' => array( 'type' => 'boolean' ),
 					),
 				),
 				array(
@@ -212,6 +213,9 @@ class FMM_REST {
 		if ( $parent && ! FMM_Taxonomy::get_folder( $parent ) ) {
 			return self::not_found();
 		}
+		if ( FMM_Taxonomy::is_protected( $parent ) ) {
+			return self::locked_error( __( 'A locked folder cannot receive folders.', 'fena-media-manager' ) );
+		}
 
 		$order  = FMM_Taxonomy::next_order( $parent );
 		$result = wp_insert_term( $name, FMM_Taxonomy::NAME, array( 'parent' => $parent ) );
@@ -238,6 +242,19 @@ class FMM_REST {
 			return self::not_found();
 		}
 
+		if ( FMM_Taxonomy::is_protected( $parent ) ) {
+			return self::locked_error( __( 'The folders inside a locked folder cannot be reordered.', 'fena-media-manager' ) );
+		}
+
+		// A locked folder keeps its position among its siblings.
+		$ids     = array_map( 'intval', (array) $request['ids'] );
+		$current = FMM_Taxonomy::child_ids( $parent, FMM_Taxonomy::get_folders( 'manual' ) );
+		foreach ( array_intersect( $current, FMM_Taxonomy::locked_ids() ) as $index => $locked_id ) {
+			if ( in_array( $locked_id, $ids, true ) && array_search( $locked_id, $ids, true ) !== $index ) {
+				return self::locked_error( __( 'A locked folder keeps its position; the order cannot be changed here.', 'fena-media-manager' ) );
+			}
+		}
+
 		$result = FMM_Taxonomy::reorder( $parent, $request['ids'] );
 		if ( is_wp_error( $result ) ) {
 			return $result;
@@ -259,8 +276,9 @@ class FMM_REST {
 	}
 
 	/**
-	 * PATCH /folders/<id>. Renames, moves, recolors and/or sets the icon of a
-	 * folder (`color`: preset key, #rrggbb, or ''/'gray' to reset; `icon`: a key
+	 * PATCH /folders/<id>. Renames, moves, recolors, sets the icon of and/or
+	 * locks or unlocks a folder (`locked`: boolean; rename and move are checked
+	 * against the lock state before the request; `color`: preset key, #rrggbb, or ''/'gray' to reset; `icon`: a key
 	 * of FMM_Taxonomy::ICONS, or ''/'folder' to reset); the slug stays stable; media assignments are untouched because the term_taxonomy_id
 	 * does not change. A moved folder goes to the end of its new level and
 	 * takes its subfolders along.
@@ -274,7 +292,7 @@ class FMM_REST {
 			return self::not_found();
 		}
 
-		if ( ! $request->has_param( 'name' ) && ! $request->has_param( 'parent' ) && ! $request->has_param( 'color' ) && ! $request->has_param( 'icon' ) ) {
+		if ( ! $request->has_param( 'name' ) && ! $request->has_param( 'parent' ) && ! $request->has_param( 'color' ) && ! $request->has_param( 'icon' ) && ! $request->has_param( 'locked' ) ) {
 			return new WP_Error( 'fmm_nothing_to_update', __( 'Nothing to update.', 'fena-media-manager' ), array( 'status' => 400 ) );
 		}
 
@@ -305,6 +323,18 @@ class FMM_REST {
 				$moved          = true;
 				$args['parent'] = $target;
 			}
+		}
+
+		// A locked folder (or one inside a locked folder) keeps name and place; a move must not drag a locked folder along or into one.
+		$protected = FMM_Taxonomy::is_protected( $folder->term_id );
+		if ( $protected && ( ( isset( $args['name'] ) && wp_specialchars_decode( $folder->name, ENT_QUOTES ) !== $args['name'] ) || $moved ) ) {
+			return self::locked_error( __( 'A locked folder cannot be renamed or moved.', 'fena-media-manager' ) );
+		}
+		if ( $moved && FMM_Taxonomy::is_protected( $parent ) ) {
+			return self::locked_error( __( 'A locked folder cannot receive folders.', 'fena-media-manager' ) );
+		}
+		if ( $moved && FMM_Taxonomy::has_locked_descendant( $folder->term_id ) ) {
+			return self::locked_error( __( 'A folder that contains a locked folder cannot be moved.', 'fena-media-manager' ) );
 		}
 
 		// wp_update_term() only rejects duplicate slugs, not duplicate names. A move is checked in the target level.
@@ -352,8 +382,26 @@ class FMM_REST {
 		} elseif ( null !== $icon ) {
 			update_term_meta( $folder->term_id, FMM_Taxonomy::ICON_META, $icon );
 		}
+		if ( $request->has_param( 'locked' ) ) {
+			if ( rest_sanitize_boolean( $request['locked'] ) ) {
+				update_term_meta( $folder->term_id, FMM_Taxonomy::LOCK_META, '1' );
+			} else {
+				delete_term_meta( $folder->term_id, FMM_Taxonomy::LOCK_META );
+			}
+			FMM_Taxonomy::reset_lock_cache();
+		}
 
 		return rest_ensure_response( FMM_Taxonomy::prepare_folder( FMM_Taxonomy::get_folder( $folder->term_id ) ) );
+	}
+
+	/**
+	 * Error for an action a folder lock forbids.
+	 *
+	 * @param string $message Translated message.
+	 * @return WP_Error
+	 */
+	private static function locked_error( $message ) {
+		return new WP_Error( 'fmm_folder_locked', $message, array( 'status' => 403 ) );
 	}
 
 	/**
@@ -376,6 +424,10 @@ class FMM_REST {
 		$folder = FMM_Taxonomy::get_folder( $request['id'] );
 		if ( ! $folder ) {
 			return self::not_found();
+		}
+
+		if ( FMM_Taxonomy::is_protected( $folder->term_id ) || FMM_Taxonomy::has_locked_descendant( $folder->term_id ) ) {
+			return self::locked_error( __( 'A locked folder, or a folder that contains one, cannot be deleted. Unlock it first.', 'fena-media-manager' ) );
 		}
 
 		$result = wp_delete_term( $folder->term_id, FMM_Taxonomy::NAME );
