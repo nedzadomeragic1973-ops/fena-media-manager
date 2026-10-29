@@ -98,25 +98,64 @@
 	box-shadow: none;
 }
 
+.fmm-settings .button,
 .fmm-settings .button-primary {
+	box-sizing: border-box;
+	height: 34px;
+	min-height: 34px;
+	margin: 0;
+	padding: 0 14px;
+	color: var(--fmm-text-body);
+	font-size: 13px;
+	font-weight: 500;
+	line-height: 32px;
+	background: var(--fmm-surface);
+	border: 1px solid var(--fmm-border);
+	border-radius: var(--fmm-radius-control);
+	box-shadow: none;
+	cursor: pointer;
+	transition: background-color var(--fmm-transition), border-color var(--fmm-transition);
+}
+
+.fmm-settings .button:hover {
+	color: var(--fmm-text-body);
+	background: var(--fmm-surface-subtle);
+	border-color: var(--fmm-border-strong);
+}
+
+.fmm-settings .button.button-primary {
 	color: var(--fmm-on-primary);
 	background: var(--fmm-primary);
 	border-color: var(--fmm-primary);
 }
 
-.fmm-settings .button-primary:hover {
+.fmm-settings .button.button-primary:hover {
 	color: var(--fmm-on-primary);
 	background: var(--fmm-primary-hover);
 	border-color: var(--fmm-primary-hover);
 }
 
-.fmm-settings .button-primary:focus-visible {
-	color: var(--fmm-on-primary);
-	background: var(--fmm-primary-hover);
-	border-color: var(--fmm-primary-hover);
+.fmm-settings .button:focus {
+	outline: 0;
+	box-shadow: none;
+}
+
+.fmm-settings .button:focus-visible {
 	outline: var(--fmm-focus-width) solid var(--fmm-focus);
 	outline-offset: 2px;
 	box-shadow: none;
+}
+
+.fmm-settings .fmm-transfer .fmm-field__help + .button {
+	margin-top: 14px;
+}
+
+.fmm-settings select[hidden] {
+	display: none;
+}
+
+.fmm-settings .fmm-field__control .fmm-picker {
+	max-width: 320px;
 }
 
 .fmm-settings .fmm-field__warning {
@@ -142,6 +181,59 @@
 	display: block;
 	max-width: 100%;
 	margin: 0 0 6px;
+	padding: 0;
+	color: var(--fmm-text-muted);
+	font-size: 13px;
+	background: none;
+	border: 0;
+	box-shadow: none;
+}
+
+.fmm-settings .fmm-transfer input[type="file"]::file-selector-button {
+	box-sizing: border-box;
+	height: 34px;
+	margin-inline-end: 10px;
+	padding: 0 14px;
+	color: var(--fmm-text-body);
+	font-size: 13px;
+	font-weight: 500;
+	background: var(--fmm-surface);
+	border: 1px solid var(--fmm-border);
+	border-radius: var(--fmm-radius-control);
+	cursor: pointer;
+}
+
+.fmm-settings .fmm-transfer input[type="file"]::-webkit-file-upload-button {
+	box-sizing: border-box;
+	height: 34px;
+	margin-inline-end: 10px;
+	padding: 0 14px;
+	color: var(--fmm-text-body);
+	font-size: 13px;
+	font-weight: 500;
+	background: var(--fmm-surface);
+	border: 1px solid var(--fmm-border);
+	border-radius: var(--fmm-radius-control);
+	cursor: pointer;
+}
+
+.fmm-settings .fmm-transfer input[type="file"]:hover::file-selector-button {
+	background: var(--fmm-surface-subtle);
+	border-color: var(--fmm-border-strong);
+}
+
+.fmm-settings .fmm-transfer input[type="file"]:hover::-webkit-file-upload-button {
+	background: var(--fmm-surface-subtle);
+	border-color: var(--fmm-border-strong);
+}
+
+.fmm-settings .fmm-transfer input[type="file"]:focus {
+	outline: 0;
+}
+
+.fmm-settings .fmm-transfer input[type="file"]:focus-visible {
+	outline: var(--fmm-focus-width) solid var(--fmm-focus);
+	outline-offset: 2px;
 }
 
 .fmm-settings .fmm-preview {
@@ -322,4 +414,31 @@
 	.fmm-settings .fmm-field__control select {
 		max-width: none;
 	}
+}
+
+@media screen and (max-width: 782px) {
+
+	.fmm-settings .button,
+	.fmm-settings .button-primary {
+		height: 40px;
+		min-height: 40px;
+		line-height: 38px;
+	}
+
+	.fmm-settings .fmm-transfer input[type="file"]::file-selector-button {
+		height: 40px;
+	}
+
+	.fmm-settings .fmm-transfer input[type="file"]::-webkit-file-upload-button {
+		height: 40px;
+	}
+}
+
+/* Notice card on this page: aligned with the cards, same weight as in the media library */
+.fmm-settings.fmm .fmm-notice-ui.notice {
+	margin: 0 0 16px;
+}
+
+.fmm-settings .fmm-notice-ui.notice p strong {
+	font-weight: 400;
 }

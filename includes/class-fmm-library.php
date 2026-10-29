@@ -81,6 +81,21 @@ class FMM_Library {
 	}
 
 	/**
+	 * Registers the shared UI components (dropdown script, component styles) used by the folder
+	 * sidebar and the settings page.
+	 */
+	public static function register_picker() {
+		self::register_tokens();
+		if ( ! wp_style_is( 'fmm-components', 'registered' ) ) {
+			wp_register_style( 'fmm-components', FMM_URL . 'assets/css/fmm-components.css', array( 'fmm-tokens' ), self::asset_version( 'assets/css/fmm-components.css' ) );
+		}
+		if ( ! wp_script_is( 'fmm-picker', 'registered' ) ) {
+			wp_register_script( 'fmm-picker', FMM_URL . 'assets/js/fmm-picker.js', array( 'jquery', 'underscore', 'wp-i18n' ), self::asset_version( 'assets/js/fmm-picker.js' ), true );
+			wp_set_script_translations( 'fmm-picker', 'fena-media-manager', FMM_PATH . 'languages' );
+		}
+	}
+
+	/**
 	 * Enqueues the folder store and the modal folder filter. Runs inside
 	 * wp_enqueue_media(), so it covers the media library, the Customizer,
 	 * the block editor and every meta box that opens the media modal.
@@ -116,7 +131,7 @@ class FMM_Library {
 	}
 
 	/**
-	 * Enqueues the folder sidebar on the media library screen. The script
+	 * Enqueues the folder sidebar and the upload progress panel on the media library screen. The script
 	 * only activates when the grid view fires `wp-media-grid-ready`.
 	 *
 	 * @param string $hook_suffix Current admin page.
@@ -128,15 +143,25 @@ class FMM_Library {
 		}
 
 		self::register_tokens();
-		wp_enqueue_style( 'fmm-media', FMM_URL . 'assets/css/fmm-media.css', array( 'fmm-tokens' ), self::asset_version( 'assets/css/fmm-media.css' ) );
+		self::register_picker();
+		wp_enqueue_style( 'fmm-components' );
+		wp_enqueue_style( 'fmm-media', FMM_URL . 'assets/css/fmm-media.css', array( 'fmm-tokens', 'fmm-components' ), self::asset_version( 'assets/css/fmm-media.css' ) );
 		wp_enqueue_script(
 			'fmm-folder-sidebar',
 			FMM_URL . 'assets/js/fmm-folder-sidebar.js',
-			array( 'fmm-media-filter' ),
+			array( 'fmm-media-filter', 'fmm-picker' ),
 			self::asset_version( 'assets/js/fmm-folder-sidebar.js' ),
 			true
 		);
 		wp_set_script_translations( 'fmm-folder-sidebar', 'fena-media-manager', FMM_PATH . 'languages' );
+		wp_enqueue_script(
+			'fmm-upload-progress',
+			FMM_URL . 'assets/js/fmm-upload-progress.js',
+			array( 'fmm-media-filter' ),
+			self::asset_version( 'assets/js/fmm-upload-progress.js' ),
+			true
+		);
+		wp_set_script_translations( 'fmm-upload-progress', 'fena-media-manager', FMM_PATH . 'languages' );
 		add_action( 'admin_footer', array( 'FMM_Icons', 'print_sprite' ) );
 	}
 

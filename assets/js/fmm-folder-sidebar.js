@@ -14,7 +14,7 @@
 
 	var fmm = window.fmmMedia;
 
-	if ( ! fmm || ! wp || ! wp.apiFetch ) {
+	if ( ! fmm || ! wp || ! wp.apiFetch || ! window.fmmPicker ) {
 		return;
 	}
 
@@ -59,7 +59,7 @@
 		check: 'check',
 		lock: 'lock-closed',
 		unlock: 'lock-open',
-		'notice-success': 'check-circle',
+		'notice-success': 'check',
 		'notice-warning': 'exclamation-triangle',
 		'notice-error': 'exclamation-circle',
 		dismiss: 'x-mark'
@@ -257,24 +257,8 @@
 	 * @param {string} value Text.
 	 * @return {Object} { text, map } with map[ i ] = original index of text[ i ].
 	 */
-	function fold( value ) {
-		var text = '';
-		var map = [];
-		var i, j, part;
+	var fold = window.fmmPicker.fold;
 
-		for ( i = 0; i < value.length; i++ ) {
-			part = value.charAt( i ).toLocaleLowerCase();
-			if ( part.normalize ) {
-				part = part.normalize( 'NFD' ).replace( /[\u0300-\u036f]/g, '' );
-			}
-			for ( j = 0; j < part.length; j++ ) {
-				map.push( i );
-			}
-			text += part;
-		}
-
-		return { text: text, map: map };
-	}
 
 	/**
 	 * Sidebar controller.
@@ -326,8 +310,8 @@
 					.append( icon( 'create' ), $( '<span></span>' ).text( __( 'New Folder', 'fena-media-manager' ) ) ) : null
 			),
 			$( '<div class="fmm-sidebar__toolbar"></div>' ).append( this.searchControl(), this.sortControl() ),
-			$( '<div class="fmm-sidebar__notice notice inline is-dismissible" hidden></div>' ).append(
-				'<span class="fmm-sidebar__notice-icon" aria-hidden="true"></span>',
+			$( '<div class="fmm-sidebar__notice fmm-notice-ui notice inline is-dismissible" hidden></div>' ).append(
+				'<span class="fmm-notice-ui__icon" aria-hidden="true"></span>',
 				'<p></p>',
 				$( '<button type="button" class="notice-dismiss"></button>' ).append(
 					icon( 'dismiss' ),
@@ -1583,228 +1567,17 @@
 		},
 
 		/**
-		 * Folder dropdown following the WAI-ARIA "select-only combobox" pattern.
+		 * Folder dropdown of the move dialog (see fmm-picker.js).
 		 *
-		 * @param {Object}   config
-		 * @param {string}   config.id       Combobox id.
-		 * @param {string}   config.labelId  Id of the label element.
-		 * @param {string}   config.listId   Listbox id.
-		 * @param {Object[]} config.options  { value, label, depth, color, icon, path }.
-		 * @param {string}   config.value    Initially selected value.
+		 * @param {Object} config See fmmPicker.create(); options { value, label, depth, color, icon, path }.
 		 * @return {Object} { $el, value(), focus() }.
 		 */
 		folderPicker: function( config ) {
-			var options = config.options;
-			var value = config.value;
-			var active = 0;
-			var typed = '';
-			var typedTimer = 0;
-			var isOpen = false;
-			var $wrap = $( '<div class="fmm-picker"></div>' );
-			var $button = $( '<button type="button" class="fmm-picker__button" role="combobox" aria-haspopup="listbox" aria-expanded="false"></button>' )
-				.attr( { id: config.id, 'aria-controls': config.listId, 'aria-labelledby': config.labelId + ' ' + config.id } );
-			var $buttonIcon = $( '<span class="fmm-picker__icon" aria-hidden="true"></span>' );
-			var $buttonLabel = $( '<span class="fmm-picker__label"></span>' );
-			var $list = $( '<ul class="fmm-picker__list" role="listbox" tabindex="-1" hidden></ul>' ).attr( { id: config.listId, 'aria-labelledby': config.labelId } );
-			var $items = [];
-
-			function markColor( $el, color ) {
-				$el.attr( 'data-fmm-color', null );
-				$el[ 0 ].style.removeProperty( '--fmm-folder-color' );
-				if ( _.contains( COLOR_PRESETS, color ) ) {
-					$el.attr( 'data-fmm-color', color );
-				} else if ( COLOR_HEX.test( color || '' ) ) {
-					$el[ 0 ].style.setProperty( '--fmm-folder-color', color );
-				}
-			}
-
-			function indexOfValue( v ) {
-				return _.findIndex( options, function( option ) {
-					return option.value === v;
-				} );
-			}
-
-			function syncButton() {
-				var option = options[ indexOfValue( value ) ];
-
-				$buttonIcon.empty().append( folderIconEls( option.icon ) ).toggleClass( 'fmm-picker__icon--plain', '0' === option.value );
-				markColor( $buttonIcon, option.color );
-				$buttonLabel.text( option.label );
-				$button.attr( 'data-value', option.value );
-				$items.forEach( function( $li, i ) {
-					$li.attr( 'aria-selected', String( options[ i ].value === value ) );
-				} );
-			}
-
-			function setActive( index ) {
-				var li;
-
-				active = Math.max( 0, Math.min( options.length - 1, index ) );
-				$items.forEach( function( $li, i ) {
-					$li.toggleClass( 'is-active', i === active );
-				} );
-				li = $items[ active ][ 0 ];
-				$button.attr( 'aria-activedescendant', li.id );
-				if ( li.offsetTop < $list[ 0 ].scrollTop ) {
-					$list[ 0 ].scrollTop = li.offsetTop - 4;
-				} else if ( li.offsetTop + li.offsetHeight > $list[ 0 ].scrollTop + $list[ 0 ].clientHeight ) {
-					$list[ 0 ].scrollTop = li.offsetTop + li.offsetHeight - $list[ 0 ].clientHeight + 4;
-				}
-			}
-
-			function onOutside( event ) {
-				if ( ! $( event.target ).closest( $wrap ).length ) {
-					close();
-				}
-			}
-
-			function open( index ) {
-				var rect = $button[ 0 ].getBoundingClientRect();
-				var below = window.innerHeight - rect.bottom - 22;
-				var above = rect.top - 22;
-				var up = below < 160 && above > below;
-
-				isOpen = true;
-				$button.attr( 'aria-expanded', 'true' );
-				$wrap.addClass( 'is-open' ).toggleClass( 'is-up', up );
-				$list.prop( 'hidden', false ).css( 'max-height', Math.max( 96, Math.min( 280, up ? above : below ) ) + 'px' );
-				setActive( undefined === index ? indexOfValue( value ) : index );
-				document.addEventListener( 'mousedown', onOutside, true );
-			}
-
-			function close() {
-				isOpen = false;
-				$button.attr( 'aria-expanded', 'false' ).removeAttr( 'aria-activedescendant' );
-				$wrap.removeClass( 'is-open is-up' );
-				$list.prop( 'hidden', true );
-				document.removeEventListener( 'mousedown', onOutside, true );
-			}
-
-			function choose( index ) {
-				value = options[ index ].value;
-				syncButton();
-				close();
-			}
-
-			function typeAhead( char ) {
-				var start = active;
-				var i, n, text;
-
-				typed += fold( char ).text;
-				clearTimeout( typedTimer );
-				typedTimer = setTimeout( function() {
-					typed = '';
-				}, 500 );
-				if ( 1 === typed.length || _.uniq( typed.split( '' ) ).length === 1 ) {
-					start = active + 1;
-					text = typed.charAt( 0 );
-				} else {
-					text = typed;
-				}
-				for ( n = 0; n < options.length; n++ ) {
-					i = ( start + n ) % options.length;
-					if ( 0 === fold( options[ i ].label ).text.indexOf( text ) ) {
-						return i;
-					}
-				}
-				return -1;
-			}
-
-			_.each( options, function( option, i ) {
-				var $icon = $( '<span class="fmm-picker__icon" aria-hidden="true"></span>' ).append( folderIconEls( option.icon ) ).toggleClass( 'fmm-picker__icon--plain', '0' === option.value );
-				var $li = $( '<li class="fmm-picker__option" role="option"></li>' ).attr( { id: config.listId + '-opt-' + option.value, 'data-value': option.value, 'aria-selected': 'false' } )
-					.css( 'padding-inline-start', ( 10 + option.depth * 16 ) + 'px' )
-					.append( $icon, $( '<span class="fmm-picker__name"></span>' ).text( option.label ), iconEl( 'check' ) );
-
-				markColor( $icon, option.color );
-				if ( option.path ) {
-					/* translators: %s: parent folder path, e.g. "Campaigns › 2025". */
-					$li.find( '.fmm-picker__name' ).after( $( '<span class="screen-reader-text"></span>' ).text( ', ' + sprintf( __( 'in %s', 'fena-media-manager' ), option.path ) ) );
-				}
-				$li.on( 'mousedown', function( event ) {
-					event.preventDefault();
-				} ).on( 'click', function() {
-					choose( i );
-					$button.trigger( 'focus' );
-				} );
-				$items.push( $li );
-				$list.append( $li );
-			} );
-
-			$button.append( $buttonIcon, $buttonLabel, iconEl( 'expanded' ) ).on( 'click', function() {
-				if ( isOpen ) {
-					close();
-				} else {
-					open();
-				}
-			} ).on( 'keydown', function( event ) {
-				var key = event.key;
-				var printable = 1 === key.length && ' ' !== key && ! event.ctrlKey && ! event.metaKey && ! event.altKey;
-				var found;
-
-				if ( ! isOpen ) {
-					if ( 'Enter' === key || ' ' === key || 'ArrowDown' === key || 'ArrowUp' === key ) {
-						event.preventDefault();
-						open();
-					} else if ( 'Home' === key || 'End' === key ) {
-						event.preventDefault();
-						open( 'Home' === key ? 0 : options.length - 1 );
-					} else if ( printable ) {
-						event.preventDefault();
-						found = typeAhead( key );
-						open( found < 0 ? undefined : found );
-					}
-					return;
-				}
-
-				if ( 'Escape' === key ) {
-					event.preventDefault();
-					event.stopPropagation();
-					close();
-				} else if ( 'Tab' === key ) {
-					choose( active );
-				} else if ( 'Enter' === key || ' ' === key || ( event.altKey && 'ArrowUp' === key ) ) {
-					event.preventDefault();
-					choose( active );
-				} else if ( 'ArrowDown' === key ) {
-					event.preventDefault();
-					setActive( active + 1 );
-				} else if ( 'ArrowUp' === key ) {
-					event.preventDefault();
-					setActive( active - 1 );
-				} else if ( 'Home' === key ) {
-					event.preventDefault();
-					setActive( 0 );
-				} else if ( 'End' === key ) {
-					event.preventDefault();
-					setActive( options.length - 1 );
-				} else if ( 'PageDown' === key ) {
-					event.preventDefault();
-					setActive( active + 10 );
-				} else if ( 'PageUp' === key ) {
-					event.preventDefault();
-					setActive( active - 10 );
-				} else if ( printable ) {
-					event.preventDefault();
-					found = typeAhead( key );
-					if ( found >= 0 ) {
-						setActive( found );
-					}
-				}
-			} );
-
-			$wrap.append( $button, $list );
-			syncButton();
-
-			return {
-				$el: $wrap,
-				value: function() {
-					return value;
-				},
-				focus: function() {
-					$button.trigger( 'focus' );
-				}
-			};
+			return window.fmmPicker.create( _.extend( {}, config, {
+				options: _.map( config.options, function( option ) {
+					return _.extend( { plain: '0' === option.value }, option );
+				} )
+			} ) );
 		},
 
 		/**
@@ -2725,7 +2498,7 @@
 			$notice.removeClass( 'notice-success notice-warning notice-error' ).addClass( 'notice-' + type )
 				.attr( 'role', 'error' === type ? 'alert' : 'status' );
 			$notice.find( 'p' ).text( message );
-			$notice.find( '.fmm-sidebar__notice-icon' ).empty().append( icon( 'notice-' + type ) );
+			$notice.find( '.fmm-notice-ui__icon' ).empty().append( icon( 'notice-' + type ) );
 			$notice.prop( 'hidden', ! message );
 			if ( message && wp.a11y ) {
 				wp.a11y.speak( message, 'error' === type ? 'assertive' : 'polite' );
@@ -2854,7 +2627,7 @@
 			if ( window.HTMLDialogElement && HTMLDialogElement.prototype.showModal ) {
 				this.dialog( {
 					title: __( 'Delete folder', 'fena-media-manager' ),
-					icon: 'delete',
+					className: 'fmm-dialog--delete',
 					describe: true,
 					initialFocus: 'cancel',
 					body: $( '<p></p>' ).text( message ),

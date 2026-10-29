@@ -161,9 +161,10 @@ class FMM_Settings {
 			return;
 		}
 
-		FMM_Library::register_tokens();
-		wp_enqueue_style( 'fmm-admin', FMM_URL . 'assets/css/fmm-admin.css', array( 'fmm-tokens' ), FMM_Library::asset_version( 'assets/css/fmm-admin.css' ) );
-		wp_enqueue_script( 'fmm-admin', FMM_URL . 'assets/js/fmm-admin.js', array(), FMM_Library::asset_version( 'assets/js/fmm-admin.js' ), true );
+		FMM_Library::register_picker();
+		wp_enqueue_style( 'fmm-admin', FMM_URL . 'assets/css/fmm-admin.css', array( 'fmm-tokens', 'fmm-components' ), FMM_Library::asset_version( 'assets/css/fmm-admin.css' ) );
+		wp_enqueue_script( 'fmm-admin', FMM_URL . 'assets/js/fmm-admin.js', array( 'jquery', 'fmm-picker' ), FMM_Library::asset_version( 'assets/js/fmm-admin.js' ), true );
+		add_action( 'admin_footer', array( 'FMM_Icons', 'print_sprite' ) );
 	}
 
 	/**
@@ -268,7 +269,7 @@ class FMM_Settings {
 							<select id="fmm-upload-folder" name="<?php echo esc_attr( $name ); ?>[upload_folder]" aria-describedby="fmm-upload-folder-help">
 								<option value="0"><?php esc_html_e( 'None', 'fena-media-manager' ); ?></option>
 								<?php foreach ( FMM_Taxonomy::get_folder_tree() as $folder ) : ?>
-									<option value="<?php echo esc_attr( $folder['id'] ); ?>"<?php selected( $upload_to, $folder['id'] ); ?>><?php echo esc_html( FMM_Taxonomy::tree_label( $folder ) ); ?></option>
+									<option value="<?php echo esc_attr( $folder['id'] ); ?>" data-depth="<?php echo esc_attr( $folder['depth'] ); ?>" data-name="<?php echo esc_attr( $folder['name'] ); ?>" data-color="<?php echo esc_attr( $folder['color'] ); ?>" data-icon="<?php echo esc_attr( $folder['icon'] ); ?>"<?php selected( $upload_to, $folder['id'] ); ?>><?php echo esc_html( FMM_Taxonomy::tree_label( $folder ) ); ?></option>
 								<?php endforeach; ?>
 							</select>
 							<p class="fmm-field__help" id="fmm-upload-folder-help"><?php esc_html_e( 'Uploads in the media library or media modal go into this folder when “All Media” is selected. A selected folder always takes precedence; uploads in “Unassigned” stay unassigned.', 'fena-media-manager' ); ?></p>
