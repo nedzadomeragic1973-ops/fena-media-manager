@@ -725,12 +725,23 @@
 	outline-offset: -1px;
 }
 
-.fmm-sidebar__item.is-drop-before {
-	box-shadow: inset 0 2px 0 var(--fmm-accent);
+.fmm-sidebar__item.is-drop-before::before,
+.fmm-sidebar__item.is-drop-after::after {
+	content: "";
+	position: absolute;
+	inset-inline: calc(var(--fmm-depth, 0) * 16px + 8px) 8px;
+	height: 2px;
+	background: var(--fmm-accent);
+	border-radius: 999px;
+	pointer-events: none;
 }
 
-.fmm-sidebar__item.is-drop-after {
-	box-shadow: inset 0 -2px 0 var(--fmm-accent);
+.fmm-sidebar__item.is-drop-before::before {
+	top: -2px;
+}
+
+.fmm-sidebar__item.is-drop-after::after {
+	bottom: -2px;
 }
 
 .fmm-sidebar .fmm-folder[draggable="true"] {

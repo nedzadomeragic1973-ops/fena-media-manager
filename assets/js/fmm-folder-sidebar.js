@@ -1128,11 +1128,11 @@
 		},
 
 		/**
-		 * Where a dragged folder would be dropped: next to a sibling row
-		 * (manual order only, top and bottom quarter) or into a folder.
+		 * Where a dragged folder would be dropped: before or after any folder row
+		 * (top and bottom 30 %, on that row's level) or into a folder (middle).
 		 *
 		 * @param {Event} event Drag event.
-		 * @return {Object|null} { $row, id, position: 'before'|'after'|'into' } or null.
+		 * @return {Object|null} { $row, id, position: 'before'|'after'|'into', parent } or null.
 		 */
 		// Whether the folders below a parent ('0' = top level) cannot be reordered: the parent is protected or a sibling is locked.
 		levelLocked: function( parentId ) {
@@ -1146,32 +1146,53 @@
 		folderDropTarget: function( event ) {
 			var $row = $( event.target ).closest( '.fmm-sidebar__item--folder' );
 			var dragged = this.node( this.dragFolder );
-			var target, rect, ratio, position;
+			var target, rect, ratio, position, level, parent, info, ids;
 
 			if ( ! $row.length || ! $.contains( this.$el[ 0 ], $row[ 0 ] ) || ! dragged ) {
 				return null;
 			}
 
 			target = this.node( rowValue( $row ) );
-			if ( ! target || String( target.folder.id ) === this.dragFolder ) {
+			if ( ! target || String( target.folder.id ) === this.dragFolder || _.contains( target.parents, this.dragFolder ) ) {
 				return null;
 			}
 
 			rect = $row[ 0 ].getBoundingClientRect();
 			ratio = ( event.clientY - rect.top ) / rect.height;
+			position = ratio < 0.3 ? 'before' : ( ratio > 0.7 ? 'after' : 'into' );
 
-			if ( 'manual' === store.sort && this.parentOf( target ) === this.parentOf( dragged ) && ( ratio < 0.25 || ratio > 0.75 ) ) {
-				if ( this.levelLocked( this.parentOf( target ) ) ) {
-					return null;
-				}
-				position = ratio < 0.25 ? 'before' : 'after';
-			} else if ( ! target.protected && ! _.contains( target.parents, this.dragFolder ) && String( target.folder.id ) !== this.parentOf( dragged ) ) {
+			// Below an expanded parent the line would mean "after its whole subtree": that edge drops into the folder instead.
+			if ( 'after' === position && $row.find( '.fmm-folder-toggle[aria-expanded="true"]' ).length ) {
 				position = 'into';
-			} else {
-				return null;
 			}
 
-			return { $row: $row, id: String( target.folder.id ), position: position };
+			if ( 'into' === position ) {
+				if ( target.protected || String( target.folder.id ) === this.parentOf( dragged ) ) {
+					return null;
+				}
+
+				return { $row: $row, id: String( target.folder.id ), position: position, parent: String( target.folder.id ) };
+			}
+
+			// Before / after: the dragged folder takes the level of the target row.
+			level = this.parentOf( target );
+			parent = '0' === level ? null : this.node( level );
+			if ( parent && parent.protected ) {
+				return null;
+			}
+			if ( level === this.parentOf( dragged ) ) {
+				if ( 'manual' !== store.sort || this.levelLocked( level ) ) {
+					return null;
+				}
+				info = this.siblings( this.dragFolder );
+				ids = _.without( info.ids, this.dragFolder );
+				ids.splice( _.indexOf( ids, String( target.folder.id ) ) + ( 'after' === position ? 1 : 0 ), 0, this.dragFolder );
+				if ( _.isEqual( ids, info.ids ) ) {
+					return null;
+				}
+			}
+
+			return { $row: $row, id: String( target.folder.id ), position: position, parent: level };
 		},
 
 		folderOver: function( event ) {
@@ -1205,11 +1226,58 @@
 				return;
 			}
 
+			if ( target.parent !== info.parent ) {
+				this.dropAtLevel( dragged, target );
+				return;
+			}
+
 			ids = _.without( info.ids, dragged );
 			ids.splice( _.indexOf( ids, target.id ) + ( 'after' === target.position ? 1 : 0 ), 0, dragged );
 			if ( ! _.isEqual( ids, info.ids ) ) {
 				this.saveOrder( dragged, info.parent, ids );
 			}
+		},
+
+		/**
+		 * Moves a dragged folder to another level, next to the target row. With
+		 * the manual order (and no locked folder on that level) it is then
+		 * placed before or after the target; otherwise the sort decides.
+		 *
+		 * @param {string} id     Dragged folder ID.
+		 * @param {Object} target { id, position, parent } from folderDropTarget().
+		 */
+		dropAtLevel: function( id, target ) {
+			var self = this;
+			var folder = store.get( id );
+			var destination = store.get( target.parent );
+			var place = 'manual' === store.sort && ! this.levelLocked( target.parent );
+
+			if ( this.busy || ! folder ) {
+				return;
+			}
+
+			this.moveFolder( id, target.parent ).then( function() {
+				var info = self.siblings( id );
+				var ids;
+
+				if ( ! place || ! info ) {
+					return null;
+				}
+				ids = _.without( info.ids, id );
+				ids.splice( _.indexOf( ids, target.id ) + ( 'after' === target.position ? 1 : 0 ), 0, id );
+
+				return _.isEqual( ids, info.ids ) ? null : store.reorder( info.parent, ids );
+			} ).catch( function( error ) {
+				if ( error && 'fmm_folder_exists' === error.code ) {
+					self.notice( destination ?
+						/* translators: 1: folder name, 2: destination folder name. */
+						sprintf( __( 'A folder named “%1$s” already exists in “%2$s”. Use “Move to…” to move and rename it.', 'fena-media-manager' ), folder.name, destination.name ) :
+						/* translators: %s: folder name. */
+						sprintf( __( 'A folder named “%s” already exists at the top level. Use “Move to…” to move and rename it.', 'fena-media-manager' ), folder.name ), 'error' );
+					return;
+				}
+				self.fail( error, __( 'The folder could not be moved.', 'fena-media-manager' ) );
+			} );
 		},
 
 		/**
