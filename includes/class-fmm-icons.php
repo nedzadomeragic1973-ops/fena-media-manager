@@ -73,6 +73,8 @@ class FMM_Icons {
 		'chevron-up'                => '<path stroke-linecap="round" stroke-linejoin="round" d="m4.5 15.75 7.5-7.5 7.5 7.5"/>',
 		'heart'                     => '<path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z"/>',
 		'arrow-top-right-on-square' => '<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/>',
+		// Own icon in the Heroicons style (not part of Heroicons).
+		'keyboard'                  => '<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 6h15A2.25 2.25 0 0 1 21.75 8.25v7.5A2.25 2.25 0 0 1 19.5 18h-15a2.25 2.25 0 0 1-2.25-2.25v-7.5A2.25 2.25 0 0 1 4.5 6ZM6 10h.01M9 10h.01M12 10h.01M15 10h.01M18 10h.01M6 13h.01M9 13h.01M12 13h.01M15 13h.01M18 13h.01M8.25 15.75h7.5"/>',
 	);
 
 	/**

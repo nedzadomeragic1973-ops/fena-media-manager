@@ -66,13 +66,14 @@
 .fmm-sidebar__header {
 	display: flex;
 	align-items: center;
-	justify-content: space-between;
+	justify-content: flex-start;
 	gap: 8px;
 	padding: 0 16px 12px;
 }
 
 .fmm-sidebar__title {
 	margin: 0;
+	margin-inline-end: auto;
 	color: var(--fmm-text);
 	font-size: 15px;
 	font-weight: 600;
@@ -218,6 +219,7 @@
 	flex: none;
 }
 
+.fmm-sort .fmm-sidebar__help,
 .fmm-sort .fmm-sort__button {
 	display: flex;
 	align-items: center;
@@ -235,11 +237,13 @@
 	transition: background-color var(--fmm-transition), border-color var(--fmm-transition);
 }
 
+.fmm-sort .fmm-sidebar__help .fmm-icon,
 .fmm-sort .fmm-sort__button .fmm-icon {
 	width: 18px;
 	height: 18px;
 }
 
+.fmm-sort .fmm-sidebar__help:hover,
 .fmm-sort .fmm-sort__button:hover {
 	background: var(--fmm-surface-subtle);
 	border-color: var(--fmm-border-strong);
@@ -251,11 +255,13 @@
 	border-color: var(--fmm-accent-border);
 }
 
+.fmm-sort .fmm-sidebar__help:focus,
 .fmm-sort .fmm-sort__button:focus {
 	outline: 0;
 	box-shadow: none;
 }
 
+.fmm-sort .fmm-sidebar__help:focus-visible,
 .fmm-sort .fmm-sort__button:focus-visible {
 	outline: var(--fmm-focus-width) solid var(--fmm-focus);
 	outline-offset: 2px;
@@ -804,18 +810,6 @@
 	line-height: 1.4;
 }
 
-/* Delete dialog: plain title with a short, soft accent line */
-.fmm-dialog--delete .fmm-dialog__title::after {
-	content: "";
-	display: block;
-	width: 28px;
-	height: 2px;
-	margin-top: 10px;
-	background: var(--fmm-accent);
-	border-radius: var(--fmm-radius-pill);
-	opacity: 0.45;
-}
-
 .fmm-dialog .fmm-dialog__header {
 	display: flex;
 	align-items: center;
@@ -1328,12 +1322,14 @@ select#media-attachment-filters ~ select#fmm-attachment-folder-filter {
 @media screen and (max-width: 782px) {
 	.fmm-sidebar__new,
 	.fmm-search .fmm-search__input,
-	.fmm-sort .fmm-sort__button {
+	.fmm-sort .fmm-sort__button,
+	.fmm-sort .fmm-sidebar__help {
 		height: 40px;
 		min-height: 40px;
 	}
 
-	.fmm-sort .fmm-sort__button {
+	.fmm-sort .fmm-sort__button,
+	.fmm-sort .fmm-sidebar__help {
 		width: 40px;
 	}
 
@@ -1403,6 +1399,7 @@ select#media-attachment-filters ~ select#fmm-attachment-folder-filter {
 
 	.fmm .fmm-sidebar__new,
 	.fmm .fmm-sort__button,
+	.fmm .fmm-sidebar__help,
 	.fmm .fmm-search__input {
 		border-color: ButtonText;
 	}
@@ -1714,4 +1711,57 @@ select#media-attachment-filters ~ select#fmm-attachment-folder-filter {
 	.fmm-upload__fill {
 		background: Highlight;
 	}
+}
+
+/* Keyboard shortcut help */
+.fmm-shortcuts {
+	margin: 0;
+}
+
+.fmm-shortcuts__row {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 16px;
+	padding: 8px 0;
+	border-top: 1px solid var(--fmm-border);
+}
+
+.fmm-shortcuts__row:first-child {
+	border-top: 0;
+}
+
+.fmm-shortcuts dt {
+	flex: none;
+	margin: 0;
+	white-space: nowrap;
+}
+
+.fmm-shortcuts dd {
+	margin: 0;
+	text-align: end;
+}
+
+.fmm-shortcuts kbd,
+.fmm-dialog .fmm-shortcuts__note kbd {
+	display: inline-block;
+	min-width: 20px;
+	box-sizing: border-box;
+	margin: 0 1px;
+	padding: 1px 6px;
+	color: var(--fmm-text);
+	font-family: inherit;
+	font-size: 12px;
+	line-height: 1.5;
+	text-align: center;
+	background: var(--fmm-surface-subtle);
+	border: 1px solid var(--fmm-border);
+	border-radius: 4px;
+}
+
+.fmm-dialog .fmm-shortcuts__note {
+	margin: 12px 0 0;
+	color: var(--fmm-text-muted);
+	font-size: 12px;
+	line-height: 2;
 }

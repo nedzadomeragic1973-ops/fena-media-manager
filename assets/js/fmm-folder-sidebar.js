@@ -62,7 +62,8 @@
 		'notice-success': 'check',
 		'notice-warning': 'exclamation-triangle',
 		'notice-error': 'exclamation-circle',
-		dismiss: 'x-mark'
+		dismiss: 'x-mark',
+		help: 'keyboard'
 	};
 
 	var SVG_NS = 'http://www.w3.org/2000/svg';
@@ -309,7 +310,7 @@
 				store.canManage ? $( '<button type="button" class="fmm-sidebar__new" data-fmm-key="new"></button>' )
 					.append( icon( 'create' ), $( '<span></span>' ).text( __( 'New Folder', 'fena-media-manager' ) ) ) : null
 			),
-			$( '<div class="fmm-sidebar__toolbar"></div>' ).append( this.searchControl(), this.sortControl() ),
+			$( '<div class="fmm-sidebar__toolbar"></div>' ).append( this.searchControl(), this.sortControl(), this.helpControl() ),
 			$( '<div class="fmm-sidebar__notice fmm-notice-ui notice inline is-dismissible" hidden></div>' ).append(
 				'<span class="fmm-notice-ui__icon" aria-hidden="true"></span>',
 				'<p></p>',
@@ -976,6 +977,14 @@
 				self.notice( '' );
 			} );
 
+			this.$el.on( 'click', '.fmm-sidebar__help', function() {
+				self.openHelp();
+			} );
+
+			this.$el.on( 'keydown', function( event ) {
+				self.shortcut( event );
+			} );
+
 			this.$el.on( 'submit', '.fmm-form', function( event ) {
 				event.preventDefault();
 				self.save( $( this ).find( 'input' ).val() );
@@ -1372,6 +1381,8 @@
 		 * @param {boolean}  [options.describe]       Whether the body describes the dialog (aria-describedby).
 		 * @param {string}   [options.initialFocus]   'cancel' to focus Cancel when opened.
 		 * @param {string}   [options.className]      Extra class for the <dialog>.
+		 * @param {boolean}  [options.closeOnly]      Only a Close button (no submit).
+		 * @param {Function} [options.onClose]        Called instead of focusing options.focus when closed.
 		 * @return {Object} API: { close(), error( message ), busy( flag ) }.
 		 */
 		dialog: function( options ) {
@@ -1381,7 +1392,7 @@
 			var $dialog = $( '<dialog class="fmm fmm-dialog"></dialog>' ).addClass( options.className ).attr( 'aria-labelledby', titleId );
 			var $error = $( '<p class="fmm-dialog__error" role="alert" hidden></p>' );
 			var $submit = $( '<button type="submit" class="fmm-dialog__submit"></button>' ).text( options.submit );
-			var $cancel = $( '<button type="button" class="fmm-dialog__cancel"></button>' ).text( __( 'Cancel', 'fena-media-manager' ) );
+			var $cancel = $( '<button type="button" class="fmm-dialog__cancel"></button>' ).text( options.closeOnly ? __( 'Close', 'fena-media-manager' ) : __( 'Cancel', 'fena-media-manager' ) );
 			var $title = $( '<h2 class="fmm-dialog__title"></h2>' ).attr( 'id', titleId ).text( options.title );
 			var api = {
 				$error: $error,
@@ -1410,18 +1421,25 @@
 						) : $title,
 					$( '<div class="fmm-dialog__body"></div>' ).attr( 'id', options.describe ? bodyId : null ).append( options.body ),
 					$error,
-					$( '<div class="fmm-dialog__footer"></div>' ).append( $cancel, $submit )
+					$( '<div class="fmm-dialog__footer"></div>' ).append( options.closeOnly ? $cancel : [ $cancel, $submit ] )
 				).on( 'submit', function( event ) {
 					event.preventDefault();
-					options.onSubmit( api );
+					if ( options.onSubmit ) {
+						options.onSubmit( api );
+					}
 				} )
 			);
 
 			$dialog.on( 'close', function() {
 				$dialog.remove();
-				self.focusKey( options.focus );
+				if ( options.onClose ) {
+					options.onClose();
+				} else {
+					self.focusKey( options.focus );
+				}
 			} );
 
+			api.$dialog = $dialog;
 			$dialog.appendTo( document.body )[ 0 ].showModal();
 			if ( 'cancel' === options.initialFocus ) {
 				$cancel.trigger( 'focus' );
@@ -1788,6 +1806,10 @@
 				/* translators: 1: folder name, 2: new position, 3: number of folders on this level. */
 				wp.a11y.speak( sprintf( __( 'Folder “%1$s” moved to position %2$d of %3$d.', 'fena-media-manager' ), folder.name, _.indexOf( ids, id ) + 1, ids.length ), 'polite' );
 
+				if ( self.focusAfterMove === id ) {
+					self.focusAfterMove = null;
+					self.focusKey( 'folder-' + id );
+				}
 				if ( action && self.menuOpen === id ) {
 					$focus = _.find( _.map( [ action + '-' + id, ( 'up' === action ? 'down-' : 'up-' ) + id, 'menu-' + id ], function( key ) {
 						return self.$el.find( '[data-fmm-key="' + key + '"]' );
@@ -2121,6 +2143,221 @@
 		},
 
 		/**
+		 * Keyboard shortcuts button of the toolbar (styled like the sort button).
+		 *
+		 * @return {jQuery} Control.
+		 */
+		helpControl: function() {
+			return $( '<div class="fmm-sort fmm-sort--help"></div>' ).append(
+				$( '<button type="button" class="fmm-sidebar__help" data-fmm-key="help" aria-haspopup="dialog"></button>' )
+					.attr( { 'aria-label': __( 'Keyboard shortcuts', 'fena-media-manager' ), title: __( 'Keyboard shortcuts', 'fena-media-manager' ) } ).append( icon( 'help' ) )
+			);
+		},
+
+		/**
+		 * Whether the platform uses Command (macOS) instead of Control for shortcuts.
+		 *
+		 * @return {boolean} True on macOS.
+		 */
+		isMac: function() {
+			return /mac/i.test( ( navigator.userAgentData && navigator.userAgentData.platform ) || navigator.platform || '' );
+		},
+
+		/**
+		 * Keyboard shortcuts of the folder sidebar. Acts only for keys pressed inside
+		 * the sidebar outside of fields, menus and dialogs; everything else passes through.
+		 *
+		 * @param {Event} event keydown event.
+		 */
+		shortcut: function( event ) {
+			var key = event.key;
+			var mac = this.isMac();
+			var target = event.target;
+			var plain = ! event.ctrlKey && ! event.metaKey && ! event.altKey;
+			var $folder = $( target ).closest( '.fmm-folder' );
+			var $li = $folder.closest( '.fmm-sidebar__item' );
+			var real = $li.hasClass( 'fmm-sidebar__item--folder' );
+			var id = real ? rowValue( $li ) : '';
+			var rows, index, can, mod, delta, action, node;
+
+			if ( event.defaultPrevented || event.isComposing || $( target ).is( 'input, textarea, select, [contenteditable]' ) || document.querySelector( 'dialog[open]' ) ||
+				this.isSortOpen() || this.menuOpen || this.dragIds || this.dragFolder || null !== this.editing ) {
+				return;
+			}
+
+			if ( '?' === key && ! event.ctrlKey && ! event.metaKey && ! event.altKey ) {
+				event.preventDefault();
+				event.stopPropagation();
+				this.openHelp();
+				return;
+			}
+
+			if ( ( 'ArrowUp' === key || 'ArrowDown' === key ) && plain && ! event.shiftKey && $folder.length ) {
+				rows = this.$el.find( '.fmm-sidebar__list .fmm-folder' ).toArray();
+				index = rows.indexOf( $folder[ 0 ] );
+				event.preventDefault();
+				event.stopPropagation();
+				if ( 'ArrowUp' === key && 0 === index ) {
+					this.$el.find( '.fmm-search__input' ).trigger( 'focus' );
+				} else if ( rows[ index + ( 'ArrowUp' === key ? -1 : 1 ) ] ) {
+					$( rows[ index + ( 'ArrowUp' === key ? -1 : 1 ) ] ).trigger( 'focus' );
+				}
+				return;
+			}
+
+			if ( ! store.canManage ) {
+				return;
+			}
+
+			if ( ( 'N' === key || 'n' === key ) && event.shiftKey && plain && ! $( target ).is( 'a' ) ) {
+				event.preventDefault();
+				event.stopPropagation();
+				this.startEdit( 'new' );
+				return;
+			}
+
+			if ( ! real ) {
+				return;
+			}
+
+			node = this.node( id );
+			can = this.actionsFor( id );
+			mod = mac ? event.metaKey && ! event.ctrlKey : event.ctrlKey && ! event.metaKey;
+
+			if ( 'F2' === key && plain && ! event.shiftKey ) {
+				action = 'rename';
+			} else if ( ( 'Delete' === key || ( mac && 'Backspace' === key ) ) && plain && ! event.shiftKey ) {
+				action = 'delete';
+			} else if ( ( 'ArrowUp' === key || 'ArrowDown' === key ) && mod && ! event.shiftKey && ! event.altKey ) {
+				delta = 'ArrowUp' === key ? -1 : 1;
+				action = delta < 0 ? 'up' : 'down';
+			} else {
+				return;
+			}
+
+			event.preventDefault();
+			event.stopPropagation();
+
+			if ( ! can[ action ] ) {
+				wp.a11y.speak( node && ( node.protected || ( 'delete' === action && node.lockedBelow ) || ( ( 'up' === action || 'down' === action ) && can.lockedPartner[ action ] ) ) ?
+					/* translators: %s: folder name. */
+					sprintf( __( 'Folder “%s” is locked.', 'fena-media-manager' ), node.folder.name ) :
+					__( 'This action is not available here.', 'fena-media-manager' ), 'polite' );
+				return;
+			}
+
+			if ( 'rename' === action ) {
+				this.startEdit( id );
+			} else if ( 'delete' === action ) {
+				this.remove( id );
+			} else {
+				this.focusAfterMove = id;
+				this.move( id, delta );
+			}
+		},
+
+		/**
+		 * Opens the keyboard shortcut help.
+		 */
+		openHelp: function() {
+			var self = this;
+			var mac = this.isMac();
+			var opener = document.activeElement && self.$el[ 0 ].contains( document.activeElement ) ? document.activeElement.getAttribute( 'data-fmm-key' ) : null;
+			var modifier = mac ? '⌘' : 'Ctrl';
+			var entries = [
+				[ [ '↑', '/', '↓' ], __( 'Move between folders', 'fena-media-manager' ) ],
+				[ [ 'Enter' ], __( 'Open folder', 'fena-media-manager' ) ]
+			];
+			var $list = $( '<dl class="fmm-shortcuts"></dl>' );
+			var $body, api;
+
+			// Only one popup at a time: the help replaces an open sort or folder menu.
+			this.closeSort( false );
+			if ( this.menuOpen ) {
+				this.closeMenu();
+			}
+
+			if ( store.canManage ) {
+				entries.push( [ [ 'Shift', '+', 'N' ], __( 'New folder', 'fena-media-manager' ) ] );
+				entries.push( [ [ 'F2' ], __( 'Rename folder', 'fena-media-manager' ) ] );
+				entries.push( [ mac ? [ '⌫', '/', 'Delete' ] : [ 'Delete' ], __( 'Delete folder (asks for confirmation)', 'fena-media-manager' ) ] );
+				entries.push( [ [ modifier, '+', '↑', '/', '↓' ], __( 'Move folder up or down (manual order)', 'fena-media-manager' ) ] );
+			}
+			entries.push( [ [ '?' ], __( 'Show this help', 'fena-media-manager' ) ] );
+
+			_.each( entries, function( entry ) {
+				var $keys = $( '<dt></dt>' );
+
+				_.each( entry[ 0 ], function( part ) {
+					$keys.append( _.contains( [ '+', '/' ], part ) ? document.createTextNode( ' ' + part + ' ' ) : $( '<kbd></kbd>' ).text( part ) );
+				} );
+				$list.append( $( '<div class="fmm-shortcuts__row"></div>' ).append( $keys, $( '<dd></dd>' ).text( entry[ 1 ] ) ) );
+			} );
+
+			$body = $( '<div></div>' ).append( $list );
+			if ( mac && store.canManage ) {
+				// Placeholders become real key caps; the surrounding text stays translatable.
+				/* translators: 1: "fn" key, 2: "F2" key. */
+				$body.append( $( '<p class="fmm-shortcuts__note"></p>' ).append( _.map( __( 'Use %1$s + %2$s to rename on Mac keyboards.', 'fena-media-manager' ).split( /(%[12]\$s)/ ), function( part ) {
+					var key = { '%1$s': 'fn', '%2$s': 'F2' }[ part ];
+					return key ? $( '<kbd></kbd>' ).text( key )[ 0 ] : document.createTextNode( part );
+				} ) ) );
+			}
+
+			api = this.dialog( {
+				title: __( 'Keyboard shortcuts', 'fena-media-manager' ),
+				body: $body,
+				closeOnly: true,
+				className: 'fmm-dialog--help',
+				onClose: function() {
+					self.focusKey( opener || 'help' );
+				}
+			} );
+			api.$dialog.on( 'keydown', function( event ) {
+				if ( '?' === event.key ) {
+					event.preventDefault();
+					api.close();
+				}
+			} );
+		},
+
+		/**
+		 * Which actions are available for a folder (menu items and keyboard shortcuts).
+		 *
+		 * @param {string} id Folder ID.
+		 * @return {Object} Booleans: rename, moveTo, appearance, up, down, lock, unlock, delete; lockedPartner { up, down }.
+		 */
+		actionsFor: function( id ) {
+			var self = this;
+			var info = this.siblings( id );
+			var index = info ? _.indexOf( info.ids, id ) : -1;
+			var manual = 'manual' === store.sort && ! this.query;
+			var node = this.node( id );
+			var dialogs = !! ( window.HTMLDialogElement && HTMLDialogElement.prototype.showModal );
+			var can = !! ( store.canManage && node );
+			var locked = !! ( node && node.folder.locked );
+			var protectedNode = !! ( node && node.protected );
+			var below = !! ( node && node.lockedBelow );
+			var partner = function( delta ) {
+				var other = info && info.ids[ index + delta ] ? self.node( info.ids[ index + delta ] ) : null;
+				return !! ( other && other.folder.locked );
+			};
+			var lockedPartner = { up: partner( -1 ), down: partner( 1 ) };
+
+			return {
+				rename: can && ! protectedNode,
+				moveTo: can && ! protectedNode && dialogs && ! below,
+				appearance: can && dialogs,
+				up: can && ! protectedNode && manual && index > 0 && ! lockedPartner.up,
+				down: can && ! protectedNode && manual && index >= 0 && index < info.ids.length - 1 && ! lockedPartner.down,
+				lock: can && ! locked,
+				unlock: can && locked,
+				'delete': can && ! protectedNode && ! below,
+				lockedPartner: lockedPartner
+			};
+		},
+
+		/**
 		 * Actions menu of a folder (inline disclosure). Add entries to the
 		 * list to extend it.
 		 *
@@ -2128,41 +2365,28 @@
 		 * @return {jQuery} Menu.
 		 */
 		menu: function( id ) {
-			var info = this.siblings( id );
-			var index = info ? _.indexOf( info.ids, id ) : -1;
-			var manual = 'manual' === store.sort && ! this.query;
-			var node = this.node( id );
-			var dialogs = window.HTMLDialogElement && HTMLDialogElement.prototype.showModal;
-			var locked = !! ( node && node.folder.locked );
-			var protectedNode = !! ( node && node.protected );
-			var below = !! ( node && node.lockedBelow );
+			var can = this.actionsFor( id );
 			var items = [];
-			var partner = function( delta ) {
-				var other = info && info.ids[ index + delta ] ? self.node( info.ids[ index + delta ] ) : null;
-				return other && other.folder.locked;
-			};
-			var self = this;
-			var lockItem = locked ?
-				{ className: 'fmm-folder-unlock', icon: 'unlock', key: 'unlock-' + id, label: __( 'Unlock folder', 'fena-media-manager' ) } :
-				{ className: 'fmm-folder-lock', icon: 'lock', key: 'lock-' + id, label: __( 'Lock folder', 'fena-media-manager' ) };
 
-			if ( ! protectedNode ) {
+			if ( can.rename ) {
 				items.push( { className: 'fmm-folder-rename', icon: 'rename', key: 'rename-' + id, label: __( 'Rename', 'fena-media-manager' ) } );
-				if ( dialogs && ! below ) {
-					items.push( { className: 'fmm-folder-moveto', icon: 'move-to', key: 'moveto-' + id, label: __( 'Move to…', 'fena-media-manager' ) } );
-				}
 			}
-			if ( dialogs ) {
+			if ( can.moveTo ) {
+				items.push( { className: 'fmm-folder-moveto', icon: 'move-to', key: 'moveto-' + id, label: __( 'Move to…', 'fena-media-manager' ) } );
+			}
+			if ( can.appearance ) {
 				items.push( { className: 'fmm-folder-color', icon: 'color', key: 'color-' + id, label: __( 'Appearance…', 'fena-media-manager' ) } );
 			}
-			if ( ! protectedNode && manual && index > 0 && ! partner( -1 ) ) {
+			if ( can.up ) {
 				items.push( { className: 'fmm-folder-up', icon: 'move-up', key: 'up-' + id, label: __( 'Move up', 'fena-media-manager' ) } );
 			}
-			if ( ! protectedNode && manual && index >= 0 && index < info.ids.length - 1 && ! partner( 1 ) ) {
+			if ( can.down ) {
 				items.push( { className: 'fmm-folder-down', icon: 'move-down', key: 'down-' + id, label: __( 'Move down', 'fena-media-manager' ) } );
 			}
-			items.push( lockItem );
-			if ( ! protectedNode && ! below ) {
+			items.push( can.unlock ?
+				{ className: 'fmm-folder-unlock', icon: 'unlock', key: 'unlock-' + id, label: __( 'Unlock folder', 'fena-media-manager' ) } :
+				{ className: 'fmm-folder-lock', icon: 'lock', key: 'lock-' + id, label: __( 'Lock folder', 'fena-media-manager' ) } );
+			if ( can[ 'delete' ] ) {
 				items.push( { className: 'fmm-folder-delete', icon: 'delete', key: 'delete-' + id, label: __( 'Delete', 'fena-media-manager' ) } );
 			}
 
@@ -2695,8 +2919,7 @@
 
 			if ( window.HTMLDialogElement && HTMLDialogElement.prototype.showModal ) {
 				this.dialog( {
-					title: __( 'Delete folder', 'fena-media-manager' ),
-					className: 'fmm-dialog--delete',
+					title: __( 'Delete folder?', 'fena-media-manager' ),
 					describe: true,
 					initialFocus: 'cancel',
 					body: $( '<p></p>' ).text( message ),
