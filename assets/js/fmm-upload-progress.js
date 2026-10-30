@@ -356,10 +356,9 @@
 				return;
 			}
 			if ( 'error' === entry.state ) {
-				speak( sprintf(
-					/* translators: 1: file name, 2: error message. */
-					__( 'Upload failed: %1$s. %2$s', 'fena-media-manager' ), entry.name, message
-				), 'assertive' );
+				// Core's uploader status announces the error text itself; only the file name is spoken here.
+				/* translators: %s: file name. */
+				speak( sprintf( __( 'Upload failed: %s.', 'fena-media-manager' ), entry.name ), 'assertive' );
 			}
 			schedule();
 		} );

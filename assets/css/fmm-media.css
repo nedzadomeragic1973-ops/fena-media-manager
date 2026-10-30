@@ -1305,6 +1305,17 @@
 	border-radius: var(--fmm-radius-control);
 }
 
+/* Core's toolbar search cannot shrink; next to the folder rail the grid can get narrower than core expects. */
+.fmm-layout .media-toolbar-primary {
+	min-width: 0;
+}
+
+.fmm-layout .media-toolbar-primary input[type="search"] {
+	flex: 1 1 0;
+	width: auto;
+	min-width: 0;
+}
+
 /*
  * Modal folder filter. Core places its filters in a two-column grid by ID
  * (type, date); the folder filter takes the next column.
