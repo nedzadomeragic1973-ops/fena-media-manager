@@ -27,6 +27,8 @@
 	var FOLDER_DRAG_TYPE = 'application/x-fmm-folder';
 	// Hover-capable desktop after a real pointer has been used: row actions are created on demand (see needsActions()).
 	var LAZY_QUERY = '(hover: hover) and (pointer: fine) and (min-width: 783px)';
+	var RAIL_ID = 'fmm-folders-panel';
+	var PHONE_QUERY = '(max-width: 600px)';
 	var COLOR_PRESETS = [ 'blue', 'violet', 'sand', 'green' ];
 	var COLOR_HEX = /^#[0-9a-f]{6}$/i;
 	var DEFAULT_CUSTOM_COLOR = '#7b61c9';
@@ -63,7 +65,9 @@
 		'notice-warning': 'exclamation-triangle',
 		'notice-error': 'exclamation-circle',
 		dismiss: 'x-mark',
-		help: 'keyboard'
+		help: 'keyboard',
+		'panel-close': 'chevron-left',
+		'panel-open': 'chevron-right'
 	};
 
 	var SVG_NS = 'http://www.w3.org/2000/svg';
@@ -308,7 +312,11 @@
 			$( '<div class="fmm-sidebar__header"></div>' ).append(
 				$( '<h2 class="fmm-sidebar__title"></h2>' ).text( __( 'Folders', 'fena-media-manager' ) ),
 				store.canManage ? $( '<button type="button" class="fmm-sidebar__new" data-fmm-key="new"></button>' )
-					.append( icon( 'create' ), $( '<span></span>' ).text( __( 'New Folder', 'fena-media-manager' ) ) ) : null
+					.append( icon( 'create' ), $( '<span></span>' ).text( __( 'New Folder', 'fena-media-manager' ) ) ) : null,
+				$( '<div class="fmm-sort fmm-sort--panel"></div>' ).append(
+					$( '<button type="button" class="fmm-panel-toggle" data-fmm-key="collapse-panel" aria-expanded="true"></button>' )
+						.attr( { 'aria-controls': RAIL_ID, 'aria-label': __( 'Collapse folders panel', 'fena-media-manager' ), title: __( 'Collapse folders panel', 'fena-media-manager' ) } ).append( icon( 'panel-close' ) )
+				)
 			),
 			$( '<div class="fmm-sidebar__toolbar"></div>' ).append( this.searchControl(), this.sortControl(), this.helpControl() ),
 			$( '<div class="fmm-sidebar__notice fmm-notice-ui notice inline is-dismissible" hidden></div>' ).append(
@@ -718,6 +726,9 @@
 			this.$el.on( 'click', '.fmm-folder', function() {
 				var value = rowValue( this );
 				self.library.props.set( PROP, '' === value ? null : value );
+				if ( self.drawerOpen && self.isPhone() ) {
+					self.setDrawer( false, true );
+				}
 			} );
 
 			// Separate button: expanding never selects the folder.
@@ -2155,6 +2166,205 @@
 		},
 
 		/**
+		 * Whether the layout is the phone drawer (max-width 600px).
+		 *
+		 * @return {boolean} True on phones.
+		 */
+		isPhone: function() {
+			return !! ( this.phoneMq && this.phoneMq.matches );
+		},
+
+		/**
+		 * Wires the collapsible panel: desktop/tablet collapse, phone drawer. Visibility is CSS only (classes on the layout).
+		 *
+		 * @param {jQuery} $layout Layout element (#wp-media-grid or the wrapper).
+		 * @param {jQuery} $rail   Rail element holding the sidebar.
+		 * @param {jQuery} $frame  Media frame element (made inert while the drawer is open).
+		 */
+		mountPanel: function( $layout, $rail, $frame ) {
+			var self = this;
+			var change;
+
+			this.$layout = $layout;
+			this.$rail = $rail.attr( 'id', RAIL_ID );
+			this.$frame = $frame;
+			this.collapsed = false;
+			this.drawerOpen = false;
+			this.slideToken = 0;
+			this.slideTimer = 0;
+			this.phoneMq = window.matchMedia ? window.matchMedia( PHONE_QUERY ) : null;
+			this.$collapseBtn = this.$el.find( '.fmm-panel-toggle' );
+			this.$openBtn = $( '<button type="button" class="fmm fmm-panel-open" data-fmm-key="expand-panel" aria-expanded="false"></button>' )
+				.attr( { 'aria-controls': RAIL_ID, 'aria-label': __( 'Expand folders panel', 'fena-media-manager' ), title: __( 'Expand folders panel', 'fena-media-manager' ) } ).append( icon( 'panel-open' ) );
+			this.$backdrop = $( '<div class="fmm-layout__backdrop" aria-hidden="true"></div>' );
+			$layout.prepend( this.$openBtn ).append( this.$backdrop );
+
+			this.$collapseBtn.on( 'click', function() {
+				self.togglePanel( false );
+			} );
+			this.$openBtn.on( 'click', function() {
+				self.togglePanel( true );
+			} );
+			this.$backdrop.on( 'click', function() {
+				self.setDrawer( false, true );
+			} );
+
+			// Escape closes the drawer, unless it belongs to a menu, field, dialog or inline editing.
+			$( document ).on( 'keydown', function( event ) {
+				if ( 'Escape' !== event.key || ! self.drawerOpen || ! self.isPhone() || event.defaultPrevented || document.querySelector( 'dialog[open]' ) ||
+					self.isSortOpen() || self.menuOpen || null !== self.editing || $( event.target ).closest( 'input, textarea, select, [contenteditable], .fmm-menu, .fmm-sort__menu, .fmm-picker' ).length ) {
+					return;
+				}
+				event.preventDefault();
+				self.setDrawer( false, true );
+			} );
+
+			change = function() {
+				self.instant( function() {
+					var style;
+
+					if ( ! self.isPhone() ) {
+						self.drawerOpen = false;
+					}
+					self.syncPanel();
+					style = window.getComputedStyle( self.$rail[ 0 ] );
+					if ( ( 'hidden' === style.visibility || 'none' === style.display ) && self.$rail[ 0 ].contains( document.activeElement ) ) {
+						self.$openBtn.trigger( 'focus' );
+					}
+				} );
+			};
+			if ( this.phoneMq ) {
+				this.phoneMq[ this.phoneMq.addEventListener ? 'addEventListener' : 'addListener' ]( 'change', change );
+			}
+			this.instant( function() {
+				self.syncPanel();
+			} );
+		},
+
+		/**
+		 * Runs a panel state change without transitions (page load, crossing a breakpoint).
+		 *
+		 * @param {Function} fn Change to apply.
+		 */
+		instant: function( fn ) {
+			var $layout = this.$layout;
+			var frame = window.requestAnimationFrame || function( cb ) {
+				return setTimeout( cb, 16 );
+			};
+
+			$layout.addClass( 'fmm-layout--instant' );
+			fn();
+			frame( function() {
+				frame( function() {
+					$layout.removeClass( 'fmm-layout--instant' );
+				} );
+			} );
+		},
+
+		/**
+		 * Duration of the panel slide in milliseconds (0 with reduced motion).
+		 *
+		 * @return {number} Milliseconds.
+		 */
+		panelDuration: function() {
+			var raw = $.trim( window.getComputedStyle( this.$layout[ 0 ] ).getPropertyValue( '--fmm-panel-duration' ) );
+			var value = parseFloat( raw );
+
+			if ( isNaN( value ) ) {
+				return 0;
+			}
+
+			return /ms$/.test( raw ) ? value : value * 1000;
+		},
+
+		/**
+		 * Calls back when the desktop/tablet slide has finished (end of the padding
+		 * transition, with a timer as fallback); immediately without motion.
+		 *
+		 * @param {Function} done Callback.
+		 */
+		afterSlide: function( done ) {
+			var self = this;
+			var $layout = this.$layout;
+			var token = ++this.slideToken;
+			var duration = this.panelDuration();
+			var finished = false;
+			var finish = function() {
+				if ( finished || token !== self.slideToken ) {
+					return;
+				}
+				finished = true;
+				clearTimeout( self.slideTimer );
+				$layout.off( 'transitionend.fmmslide' ).removeClass( 'fmm-layout--animating' );
+				done();
+			};
+
+			clearTimeout( this.slideTimer );
+			$layout.off( 'transitionend.fmmslide' );
+			if ( ! duration ) {
+				$layout.removeClass( 'fmm-layout--animating' );
+				done();
+				return;
+			}
+			$layout.addClass( 'fmm-layout--animating' ).on( 'transitionend.fmmslide', function( event ) {
+				var original = event.originalEvent;
+
+				if ( original && original.target === $layout[ 0 ] && /padding/.test( original.propertyName ) ) {
+					finish();
+				}
+			} );
+			this.slideTimer = setTimeout( finish, duration + 50 );
+		},
+
+		/**
+		 * Collapses or expands the panel (phone: closes or opens the drawer) and moves focus to the other button.
+		 *
+		 * @param {boolean} show Whether the panel should be shown.
+		 */
+		togglePanel: function( show ) {
+			if ( this.isPhone() ) {
+				this.setDrawer( show, true );
+				return;
+			}
+			this.collapsed = ! show;
+			this.syncPanel();
+			( show ? this.$collapseBtn : this.$openBtn ).trigger( 'focus' );
+			this.afterSlide( function() {
+				$( window ).trigger( 'resize' );
+			} );
+		},
+
+		/**
+		 * Opens or closes the phone drawer.
+		 *
+		 * @param {boolean} open  Whether to open it.
+		 * @param {boolean} focus Move focus to the button that is now visible.
+		 */
+		setDrawer: function( open, focus ) {
+			this.drawerOpen = open;
+			this.syncPanel();
+			if ( focus ) {
+				( open ? this.$collapseBtn : this.$openBtn ).trigger( 'focus' );
+			}
+		},
+
+		/**
+		 * Applies the panel state: layout classes, aria-expanded, inert and scroll lock.
+		 */
+		syncPanel: function() {
+			var phone = this.isPhone();
+			var shown = phone ? this.drawerOpen : ! this.collapsed;
+			var locked = phone && this.drawerOpen;
+
+			this.$layout.toggleClass( 'fmm-layout--collapsed', this.collapsed ).toggleClass( 'fmm-layout--drawer-open', locked );
+			this.$collapseBtn.add( this.$openBtn ).attr( 'aria-expanded', String( shown ) );
+			if ( this.$frame && this.$frame[ 0 ] ) {
+				this.$frame[ 0 ].inert = locked;
+			}
+			$( [ document.documentElement, document.body ] ).toggleClass( 'fmm-drawer-lock', locked );
+		},
+
+		/**
 		 * Whether the platform uses Command (macOS) instead of Control for shortcuts.
 		 *
 		 * @return {boolean} True on macOS.
@@ -3031,7 +3241,7 @@
 	} );
 
 	$( document ).on( 'wp-media-grid-ready', function( event, frame ) {
-		var sidebar, $wrap;
+		var sidebar, $wrap, $rail;
 
 		if ( ! frame || ! frame.$el || ! frame.state || ! frame.state().get( 'library' ) ) {
 			return;
@@ -3049,7 +3259,8 @@
 			frame.$el.wrap( '<div class="fmm-layout"></div>' );
 		}
 		// The rail sits before the grid so reading and tab order stay: heading, notices, folders, grid.
-		$( '<div class="fmm fmm-layout__rail"></div>' ).append( sidebar.$el ).insertBefore( frame.$el );
+		$rail = $( '<div class="fmm fmm-layout__rail"></div>' ).append( sidebar.$el ).insertBefore( frame.$el );
+		sidebar.mountPanel( frame.$el.parent(), $rail, frame.$el );
 
 		// The grid computes its columns from the container width.
 		$( window ).trigger( 'resize' );
