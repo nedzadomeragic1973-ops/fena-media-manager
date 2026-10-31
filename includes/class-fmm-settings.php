@@ -286,7 +286,12 @@ class FMM_Settings {
 		$name      = self::OPTION;
 		?>
 		<div class="wrap fmm fmm-settings">
-			<h1><?php esc_html_e( 'Fena Media Manager', 'fena-media-manager' ); ?></h1>
+			<div class="fmm-card fmm-hero">
+				<img class="fmm-hero__image" src="<?php echo esc_url( add_query_arg( 'ver', FMM_Library::asset_version( 'assets/img/ffm-folder-header.svg' ), FMM_URL . 'assets/img/ffm-folder-header.svg' ) ); ?>" width="42" height="28" alt="" decoding="async">
+				<h1 class="fmm-hero__title"><?php esc_html_e( 'Fena Media Manager', 'fena-media-manager' ); ?></h1>
+			</div>
+			<?php // Core moves admin notices below this marker instead of into the header card. ?>
+			<hr class="wp-header-end">
 			<?php settings_errors(); ?>
 			<form method="post" action="options.php">
 				<?php settings_fields( self::OPTION ); ?>

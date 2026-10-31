@@ -17,6 +17,32 @@
 	border-radius: 6px;
 }
 
+/* Header card: folder mark (decorative) followed by the page title */
+.fmm-settings .fmm-card.fmm-hero {
+	display: flex;
+	align-items: center;
+	justify-content: flex-start;
+	gap: 12px;
+	margin-bottom: 0; /* The next card's top margin sets the gap, as between the other cards. */
+	padding-top: 12px;
+	padding-bottom: 12px;
+}
+
+.fmm-settings .fmm-hero__title {
+	min-width: 0;
+	margin: 0;
+	padding: 0;
+	color: var(--fmm-text);
+	overflow-wrap: anywhere;
+}
+
+.fmm-settings .fmm-hero__image {
+	display: block;
+	flex: none;
+	width: 42px;
+	height: auto;
+}
+
 .fmm-settings .fmm-card h2 {
 	margin: 0 0 16px;
 	padding: 0;
