@@ -612,6 +612,29 @@ class FMM_Taxonomy {
 	}
 
 	/**
+	 * Lowercases text for case-insensitive comparisons.
+	 *
+	 * Uses mb_strtolower() when the mbstring extension is loaded. Without it
+	 * only ASCII letters are lowercased, so name comparisons are then case-insensitive for ASCII only.
+	 *
+	 * @param mixed $text Text.
+	 * @return string
+	 */
+	public static function lower( $text ) {
+		return function_exists( 'mb_strtolower' ) ? mb_strtolower( (string) $text, 'UTF-8' ) : strtr( (string) $text, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz' );
+	}
+
+	/**
+	 * Whether a value is a non-empty string of ASCII digits (like ctype_digit() for strings, without the ctype extension).
+	 *
+	 * @param mixed $value Value.
+	 * @return bool
+	 */
+	public static function is_digits( $value ) {
+		return is_string( $value ) && 1 === preg_match( '/^\d+$/D', $value );
+	}
+
+	/**
 	 * Whether a folder named like this already exists below a parent.
 	 * Case-insensitive; orphans count as top level (see child_ids()).
 	 *
@@ -623,10 +646,10 @@ class FMM_Taxonomy {
 	public static function name_exists( $name, $parent_id, $exclude_id = 0 ) {
 		$folders = self::get_folders();
 		$ids     = self::child_ids( $parent_id, $folders );
-		$name    = mb_strtolower( $name );
+		$name    = self::lower( $name );
 
 		foreach ( $folders as $folder ) {
-			if ( $folder['id'] !== (int) $exclude_id && in_array( $folder['id'], $ids, true ) && mb_strtolower( $folder['name'] ) === $name ) {
+			if ( $folder['id'] !== (int) $exclude_id && in_array( $folder['id'], $ids, true ) && self::lower( $folder['name'] ) === $name ) {
 				return true;
 			}
 		}

@@ -28,10 +28,9 @@ class FMM_Plugin {
 	}
 
 	/**
-	 * Loads translations and registers the folder taxonomy.
+	 * Registers the folder taxonomy.
 	 */
 	public static function on_init() {
-		load_plugin_textdomain( 'fena-media-manager', false, dirname( plugin_basename( FMM_FILE ) ) . '/languages' );
 		FMM_Taxonomy::register();
 	}
 }

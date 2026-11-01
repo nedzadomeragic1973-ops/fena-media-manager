@@ -40,7 +40,7 @@ class FMM_Library {
 
 		if ( isset( $_POST['fmm_folder'] ) ) {
 			$folder     = sanitize_text_field( wp_unslash( $_POST['fmm_folder'] ) );
-			$folder_ids = ctype_digit( $folder ) ? FMM_Taxonomy::filter_folder_ids( array( (int) $folder ) ) : array();
+			$folder_ids = FMM_Taxonomy::is_digits( $folder ) ? FMM_Taxonomy::filter_folder_ids( array( (int) $folder ) ) : array();
 		} else {
 			$default    = (int) FMM_Settings::get( 'upload_folder' );
 			$folder_ids = $default ? array( $default ) : array();
@@ -223,7 +223,7 @@ class FMM_Library {
 			);
 		}
 
-		if ( ctype_digit( $value ) && (int) $value > 0 ) {
+		if ( FMM_Taxonomy::is_digits( $value ) && (int) $value > 0 ) {
 			return array(
 				'taxonomy'         => FMM_Taxonomy::NAME,
 				'field'            => 'term_id',

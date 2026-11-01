@@ -377,7 +377,7 @@ class FMM_Transfer {
 
 			$name = self::validate_name( $item, $here, $state );
 			if ( null !== $name ) {
-				$lower = mb_strtolower( $name );
+				$lower = FMM_Taxonomy::lower( $name );
 				if ( isset( $seen[ $lower ] ) ) {
 					self::add_error( $state, $here . '.name', __( 'Duplicate folder name among siblings.', 'fena-media-manager' ) );
 				}
@@ -549,7 +549,7 @@ class FMM_Transfer {
 			$json = substr( $json, 3 );
 		}
 
-		if ( ! mb_check_encoding( $json, 'UTF-8' ) ) {
+		if ( 1 !== preg_match( '//u', $json ) ) {
 			$result = self::failure( __( 'The file is not valid UTF-8.', 'fena-media-manager' ) );
 		} else {
 			$result = self::parse( $json );
@@ -586,7 +586,7 @@ class FMM_Transfer {
 
 		foreach ( $folders as $folder ) {
 			$parent = isset( $known[ $folder['parent'] ] ) ? $folder['parent'] : 0;
-			$lower  = mb_strtolower( $folder['name'] );
+			$lower  = FMM_Taxonomy::lower( $folder['name'] );
 			if ( ! isset( $kids[ $parent ][ $lower ] ) ) {
 				$kids[ $parent ][ $lower ] = $folder['id'];
 			}
@@ -617,7 +617,7 @@ class FMM_Transfer {
 			$id     = 0;
 			$status = $inherit;
 			if ( '' === $status ) {
-				$lower = mb_strtolower( $node['name'] );
+				$lower = FMM_Taxonomy::lower( $node['name'] );
 				if ( isset( $existing['kids'][ $parent_id ][ $lower ] ) ) {
 					$id     = $existing['kids'][ $parent_id ][ $lower ];
 					$status = 'merge' === $strategy ? 'merge' : 'skip';
@@ -892,7 +892,7 @@ class FMM_Transfer {
 
 		foreach ( $nodes as $position => $node ) {
 			$here  = $path . '[' . $position . ']';
-			$lower = mb_strtolower( $node['name'] );
+			$lower = FMM_Taxonomy::lower( $node['name'] );
 			$id    = isset( $index['kids'][ $parent_id ][ $lower ] ) ? $index['kids'][ $parent_id ][ $lower ] : 0;
 
 			if ( ! $id && $parent_id && FMM_Taxonomy::is_protected( $parent_id ) ) {

@@ -19,6 +19,14 @@ Folders are virtual. They are stored as a private WordPress taxonomy, so **files
 
 The plugin uses no custom database tables, loads no external resources and needs no account. Deactivating or deleting it keeps all folders, assignments and settings in the database.
 
+= Why Fena Media Manager? =
+
+* **Free, with every feature included.** No Pro version, no upgrade notices, no feature limits.
+* **Built on WordPress standards.** Folders are a regular private taxonomy – no custom database tables, no external requests, no build tools. Deactivating or deleting the plugin removes nothing.
+* **Folder Lock.** Protect your folder structure against accidental renaming, moving or deleting – enforced on the server, not only in the interface.
+* **Portable folder structures.** Export your folders as JSON and import them on another site, with validation and a preview before anything is created.
+* **Accessible by design.** Every action works with the keyboard, with shortcuts, a built-in help, screen reader announcements and visible focus.
+
 = Folders and subfolders =
 
 * Folder sidebar next to the media grid, with "All Media", "Unassigned" and a media count per folder.
@@ -143,7 +151,7 @@ Nothing is deleted. Folders, assignments and settings remain in the database and
 
 = Which uploads use the default upload folder? =
 
-Uploads started in the media library grid or in the media modal while "All Media" is selected. An open folder always takes precedence, and uploads started in "Unassigned" stay unassigned. Uploads via the "Add New Media File" page, the REST API or code are not affected.
+Uploads started in the media library grid or in the media modal while "All Media" is selected. An open folder always takes precedence, and uploads started in "Unassigned" stay unassigned. Uploads via the separate upload page (Media > Add Media File, media-new.php), the REST API or code are not affected.
 
 = Does the block editor's inserter show folders? =
 
