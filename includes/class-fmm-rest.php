@@ -216,6 +216,9 @@ class FMM_REST {
 		if ( FMM_Taxonomy::is_protected( $parent ) ) {
 			return self::locked_error( __( 'A locked folder cannot receive folders.', 'fena-media-manager' ) );
 		}
+		if ( FMM_Taxonomy::name_exists( $name, $parent ) ) {
+			return self::term_error( new WP_Error( 'term_exists' ) );
+		}
 
 		$order  = FMM_Taxonomy::next_order( $parent );
 		$result = wp_insert_term( $name, FMM_Taxonomy::NAME, array( 'parent' => $parent ) );
